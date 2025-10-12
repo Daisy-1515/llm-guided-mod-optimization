@@ -1,6 +1,18 @@
-# llm-guided-mod-optimization
+<div align=center>
+<h1 align="center">
+LLM-Guided-MoD-Optimization
+</h1>
+<h3 align="center">
+Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems
+</h3>
 
-This repository contains code for our paper **"Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems"**.
+### [Paper](https://neurips.cc/virtual/2025/poster/117702) | [Project Page](https://github.com/yizhangele/llm-guided-mod-optimization) 
+
+![Unbalanced World](./image/unbalancedWorld.png)
+
+## Introduction
+
+<img src="./image/workFlow.png" alt="framework" width="500" height="auto" div align=center>
 
 ## Installation
 
