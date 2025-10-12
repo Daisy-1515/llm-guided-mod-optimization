@@ -35,7 +35,7 @@ python testAll.py
 
 ## License
 
-This project is licensed under **MIT**.  
+This project is licensed under the terms of the MIT license. See LICENSE.txt for details. 
 
 **Note:** Some dependencies, such as Gurobi, require separate licenses. Academic users can obtain a free license for research purposes; commercial use requires a paid license.
 
