@@ -1,0 +1,20 @@
+# taxiDispatch Dependencies
+
+name: taxiDispatch
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - transformers
+  - tiktoken
+  - pandas
+  - numpy
+  - configobj
+  - python-dotenv
+  - joblib
+  - requests
+  - pip
+  - pip:
+    - gurobipy
+    - ortools
+    - sentence-transformers
