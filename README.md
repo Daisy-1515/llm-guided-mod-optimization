@@ -11,8 +11,7 @@ Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Dem
 ![Unbalanced World](./image/unbalancedWorld.png)
 
 ## Introduction
-
-<img src="./image/workFlow.png" alt="framework" width="500" height="auto" div align=center>
+![Framework](./image/workFlow.png)
 
 ## Installation
 
