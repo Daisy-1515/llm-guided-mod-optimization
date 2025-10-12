@@ -5,6 +5,8 @@ LLM-Guided-MoD-Optimization
 <h3 align="center">
 Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems
 </h3>
+</div>
+<br>
 
 ### [Paper](https://neurips.cc/virtual/2025/poster/117702) | [Project Page](https://github.com/yizhangele/llm-guided-mod-optimization) 
 
@@ -12,6 +14,8 @@ Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Dem
 
 ## Introduction
 ![Framework](./image/workFlow.png)
+
+Our framework hierarchically decomposes each decision step into two levels. The **high-level module** assigns passengers to taxis based on real-time spatial configurations and anticipated supply-demand imbalances, while the **low-level module** solves the routing or visiting sequence problem for each taxi to minimize passenger waiting time under spatiotemporal constraints. To address the partial observability challenge—where the high-level model lacks foresight into downstream routing dynamics—we employ a **large language model (LLM)** as a meta-heuristic designer. The LLM leverages its implicit understanding of urban mobility patterns to adaptively refine high-level objectives. As illustrated in Figure 1, the LLM generates high-level assignment objectives that serve as semantic guides within the optimization loop. These objectives are embedded into a closed-loop evolutionary process, where each simulation epoch evaluates their fitness. The evolutionary mechanism is guided by a **harmony search algorithm**, iteratively refining the LLM prompt space to improve objective quality. This feedback-driven process enables the LLM-generated heuristics to adapt and improve over time, combining the semantic richness of the LLM with the structural robustness of traditional optimization.
 
 ## Installation
 
