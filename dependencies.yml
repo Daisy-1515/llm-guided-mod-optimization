@@ -1,6 +1,6 @@
-# taxiDispatch Dependencies
+# llm-guided-mod-optimization Dependencies
 
-name: taxiDispatch
+name: llm-guided-mod-optimization
 channels:
   - defaults
   - conda-forge
