@@ -44,5 +44,10 @@ This project is licensed under **MIT**.
 If you use this code in your research, please cite:
 
 ```
-[Add appropriate citation format when published]
+@inproceedings{llm-guided-mod-optimization,
+    title={Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems},
+    author={Yi Zhang, Yushen Long, Yun Ni, Liping Huang, Xiaohong Wang, Jun Liu},
+    booktitle={Conference on Neural Information Processing Systems (NeurIPS)},
+    year={2025}
+}
 ```
