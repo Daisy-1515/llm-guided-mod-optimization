@@ -1,21 +1,48 @@
 <div align=center>
 <h1 align="center">
-LLM-Guided-MoD-Optimization
+Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems
 </h1>
 <h3 align="center">
-Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems
+LLM + Mathematical Optimization
 </h3>
 </div>
 
-### [Paper](https://neurips.cc/virtual/2025/poster/117702) | [Project Page](https://github.com/yizhangele/llm-guided-mod-optimization) 
-
+### [Paper Link](https://arxiv.org/pdf/2510.10644) 
+<!---
+| [Project Page](https://github.com/yizhangele/llm-guided-mod-optimization) 
+-->
+<!---
 ![Unbalanced World](./image/unbalancedWorld.png)
-Online ride-hailing platforms aim to deliver efficient mobility-on-demand services but face challenges in balancing dynamic and spatially heterogeneous supply and demand. Existing methods often rely on reinforcement learning, which can be data-inefficient and struggle with real-world constraints, or on decomposed online optimization approaches that use manually designed high-level objectives lacking awareness of low-level routing dynamics. 
-
+-->
+<!---
 ## Introduction
-![Framework](./image/workFlow.png)
+-->
+## Method Overview
+<p align="center">
+    <img src="./image/unbalancedWorld.png" alt="Alt Text" style="width:80%; height:auto;">
+</p>
 
-Our framework combines **AI-driven insights with mathematical optimization** in a dynamic hierarchical system. A **high-level module** assigns passengers to taxis, while a **low-level module** plans efficient routes and enforces operational constraints. We leverage a **large language model (LLM)** as a meta-optimizer to adaptively generate semantic heuristics that guide the low-level optimizer. These heuristics are refined through a closed-loop evolutionary process, driven by harmony search, allowing the LLM to iteratively improve its guidance based on real-time performance feedback. This hybrid approach unites the flexibility and semantic reasoning of LLMs with the robustness and reliability of traditional optimization, enabling scalable and adaptive urban mobility solutions.
+<p align="justify">
+Mobility-on-demand platforms, such as ride-hailing services, have become critical urban transportation infrastructures. They address unbalanced demand and supply by continuously executing decision-making processes.
+</p>
+
+<p align="center">
+    <img src="./image/workFlow.png" alt="Alt Text" style="width:80%; height:auto;">
+</p>
+
+<p align="justify">
+Our proposed method <strong>integrates large language model (LLM) with mathematical optimization</strong> in a dynamic hierarchical system to optimize mobility operations. The hybrid LLM-optimizer framework decomposes the problem hierarchically, strategically embedding LLM only where human expertise bottlenecks exist:
+</p>
+
+- <strong>LLM as Meta-Objective Designer</strong>: Dynamically evolves strategic objectives via prompt-based harmony search, guided by feasibility feedback from the optimization solver.
+- <strong>Optimizer as Constraint Enforcer</strong>: Solves operational routing layer with mathematical rigor, ensuring real-time feasibility.
+- <strong>Heuristics as Prompt Evolver</strong>: Leverages harmony search algorithm to iteratively refine LLM prompts, guided by optimizer feedback to adaptively explore and
+converge toward effective meta-objectives
+
+
+<p align="justify">
+This hybrid approach <strong>combines the semantic richness of LLM with the structural robustness of traditional optimization</strong>, delivering solutions that outperform state-of-the-art baselines.
+</p>
 
 ## Installation
 
@@ -30,20 +57,20 @@ cd llm-guided-mod-optimization
 conda env create -f dependencies.yml
 conda activate llm-guided-mod-optimization
 ```
-Or manually install the dependencies.
+You can also manually install the dependencies.
 
-**Note:** This code depends on Gurobi (`gurobipy`), which requires a license.  
-- Academic users can obtain a **free academic license** from Gurobi: [Gurobi Academic License](https://www.gurobi.com/academia/academic-program-and-licenses/)  
-- Commercial use requires a paid license.
+**Note:** This code depends on Gurobi (`gurobipy`), which requires a license.
+- Academic users can request **free academic licenses** from Gurobi: [Gurobi Academic License](https://www.gurobi.com/academia/academic-program-and-licenses/)
+- Commercial users need paid licenses.
 
-### 3. Configuration
-1. Update `config/env/.env` with the key for your LLM API provider.
-2. Update `config/setting.cfg` as needed.
-3. If using a non-HuggingFace provider, implement the logic to interact with that provider.
+### 3. Update Configuration Files
+1. Update `config/env/.env` with the API access token for your chosen LLM hosting provider.
+2. Depending on your chosen LLM model and hosting provider, you may need to implement your own code to formulate API requests and parse heuristics from API responses.
+3. Update all other configurations in `config/setting.cfg`.
 
 ## Usage
 
-### Running Tests
+### Running A Test
 ```bash
 python testAll.py
 ```
@@ -52,7 +79,7 @@ python testAll.py
 
 This project is licensed under the terms of the MIT license. See LICENSE.txt for details. 
 
-**Note:** Some dependencies, such as Gurobi, require separate licenses. Academic users can obtain a free license for research purposes; commercial use requires a paid license.
+**Note:** Some dependencies, such as Gurobi, require separate licenses. Academic users can request free licenses for research purposes. Commercial users need paid licenses.
 
 ## Citation
 
