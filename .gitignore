@@ -1,0 +1,50 @@
+# ---- Agent local config ----
+.claude/
+.codex/
+.gemini/
+
+# ---- Editor / IDE ----
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# ---- OS files ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Python cache / build ----
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+ENV/
+
+# ---- Logs / runtime artifacts ----
+logs/
+*.log
+*.tmp
+*.temp
+
+# ---- Local env / secrets ----
+.env
+.env.*
+*.local
