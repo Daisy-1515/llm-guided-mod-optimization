@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(modification_plan_edge_uav.md:*)"
+    ]
+  }
+}
