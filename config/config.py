@@ -38,10 +38,53 @@ class configPara:
         
         # simulation
         self.runTime = 600
-        self.interval = 300  
+        self.interval = 300
         self.taxiNum = 60
         self.passNum = 70
         self.city = "NYC"
+
+        # ---- Edge UAV 参数（默认值，由 setting.cfg 覆盖）----
+
+        # 物理环境
+        self.delta = 1.0        # 时隙长度 (s)
+        self.T = 20             # 总时隙数
+        self.x_max = 1000.0     # 空域 x 边界 (m)
+        self.y_max = 1000.0     # 空域 y 边界 (m)
+        self.H = 100.0          # UAV 固定飞行高度 (m)
+        self.N_0 = 1e-10        # 噪声功率 (W)
+        self.d_U_safe = 50.0    # UAV 间安全距离 (m)
+
+        # 通信
+        self.B_up = 1e6         # 上行带宽 (Hz)
+        self.B_down = 1e6       # 下行带宽 (Hz)
+        self.P_i = 0.5          # TD 发射功率 (W)
+        self.P_j = 1.0          # UAV 发射功率 (W)
+        self.rho_0 = 1e-5       # 1m 参考信道增益
+
+        # 能耗系数
+        self.gamma_i = 1e-28    # TD 芯片能耗系数
+        self.gamma_j = 1e-28    # 边缘节点芯片能耗系数
+
+        # UAV 推进模型（公式18）
+        self.v_U_max = 30.0     # 最大飞行速度 (m/s)
+        self.v_tip = 120.0      # 桨尖速度 (m/s)
+        self.eta_1 = 79.86      # 叶片剖面功率 (W)
+        self.eta_2 = 88.63      # 诱导功率 (W)
+        self.eta_3 = 0.0151     # 机身阻力比
+        self.eta_4 = 0.0048     # 空气密度系数
+
+        # 场景规模
+        self.numTasks = 10      # 终端设备数
+        self.numUAVs = 3        # UAV 数
+
+        # UAV 硬件默认值
+        self.E_max = 5000.0     # 能量预算 (J)
+        self.f_max = 5e9        # 最大 CPU 频率 (Hz)
+
+        # 优化权重
+        self.alpha = 1.0        # 时延权重
+        self.gamma_w = 1.0      # 计算能耗权重
+        self.lambda_w = 1.0     # 飞行能耗权重
 
         self.default_obj = """
 def dynamic_obj_func(self): 
@@ -131,6 +174,49 @@ def dynamic_obj_func(self):
         self.taxiNum = self.get_config_value('simSettings', 'totalVehicleNum', self.taxiNum, cast=int)
         self.passNum = self.get_config_value('simSettings', 'totalPassNum', self.passNum, cast=int)
         self.city = self.get_config_value('simSettings', 'city', self.city)
+
+        # ---- Edge UAV 参数加载 ----
+
+        # 物理环境
+        self.delta = self.get_config_value('edgeUavEnv', 'delta', self.delta, cast=float)
+        self.T = self.get_config_value('edgeUavEnv', 'T', self.T, cast=int)
+        self.x_max = self.get_config_value('edgeUavEnv', 'x_max', self.x_max, cast=float)
+        self.y_max = self.get_config_value('edgeUavEnv', 'y_max', self.y_max, cast=float)
+        self.H = self.get_config_value('edgeUavEnv', 'H', self.H, cast=float)
+        self.N_0 = self.get_config_value('edgeUavEnv', 'N_0', self.N_0, cast=float)
+        self.d_U_safe = self.get_config_value('edgeUavEnv', 'd_U_safe', self.d_U_safe, cast=float)
+
+        # 通信
+        self.B_up = self.get_config_value('edgeUavComm', 'B_up', self.B_up, cast=float)
+        self.B_down = self.get_config_value('edgeUavComm', 'B_down', self.B_down, cast=float)
+        self.P_i = self.get_config_value('edgeUavComm', 'P_i', self.P_i, cast=float)
+        self.P_j = self.get_config_value('edgeUavComm', 'P_j', self.P_j, cast=float)
+        self.rho_0 = self.get_config_value('edgeUavComm', 'rho_0', self.rho_0, cast=float)
+
+        # 能耗系数
+        self.gamma_i = self.get_config_value('edgeUavEnergy', 'gamma_i', self.gamma_i, cast=float)
+        self.gamma_j = self.get_config_value('edgeUavEnergy', 'gamma_j', self.gamma_j, cast=float)
+
+        # 推进模型
+        self.v_U_max = self.get_config_value('edgeUavProp', 'v_U_max', self.v_U_max, cast=float)
+        self.v_tip = self.get_config_value('edgeUavProp', 'v_tip', self.v_tip, cast=float)
+        self.eta_1 = self.get_config_value('edgeUavProp', 'eta_1', self.eta_1, cast=float)
+        self.eta_2 = self.get_config_value('edgeUavProp', 'eta_2', self.eta_2, cast=float)
+        self.eta_3 = self.get_config_value('edgeUavProp', 'eta_3', self.eta_3, cast=float)
+        self.eta_4 = self.get_config_value('edgeUavProp', 'eta_4', self.eta_4, cast=float)
+
+        # 场景规模
+        self.numTasks = self.get_config_value('edgeUavScenario', 'numTasks', self.numTasks, cast=int)
+        self.numUAVs = self.get_config_value('edgeUavScenario', 'numUAVs', self.numUAVs, cast=int)
+
+        # UAV 硬件
+        self.E_max = self.get_config_value('edgeUavHardware', 'E_max', self.E_max, cast=float)
+        self.f_max = self.get_config_value('edgeUavHardware', 'f_max', self.f_max, cast=float)
+
+        # 优化权重
+        self.alpha = self.get_config_value('edgeUavWeights', 'alpha', self.alpha, cast=float)
+        self.gamma_w = self.get_config_value('edgeUavWeights', 'gamma_w', self.gamma_w, cast=float)
+        self.lambda_w = self.get_config_value('edgeUavWeights', 'lambda_w', self.lambda_w, cast=float)
         
         # then load environment variables
         self.getEnvInfo()
