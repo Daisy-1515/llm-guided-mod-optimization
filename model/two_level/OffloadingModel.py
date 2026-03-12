@@ -1,15 +1,14 @@
 """
-File: OffloadingModel.py
+文件: OffloadingModel.py
 
-Level-1 BLP for Edge UAV computation offloading.
+Edge UAV 计算卸载的 Level-1 二进制线性规划（BLP）。
 
-This module solves the task offloading decision subproblem:
-given fixed UAV trajectories and resource allocation (from Level 2),
-decide which tasks execute locally and which offload to which UAV.
+本模块求解任务卸载决策子问题：
+在 Level-2 给定的固定 UAV 轨迹与资源分配条件下，
+决定哪些任务在本地执行，哪些卸载到哪架 UAV。
 
-The objective function can be dynamically replaced by LLM-generated
-code via exec(), following the same injection pattern as the original
-AssignmentModel.py.
+目标函数可通过 exec() 注入 LLM 生成的代码动态替换，
+与原项目 AssignmentModel.py 的注入模式一致。
 """
 
 import time
@@ -18,24 +17,24 @@ import gurobipy as gb
 
 
 class OffloadingModel:
-    """Level-1 Binary Linear Program for task offloading decisions.
+    """Level-1 任务卸载决策二进制线性规划。
 
-    Attributes exposed to LLM-generated dynamic_obj_func(self):
-        self.x_local[i, t]           - binary decision variable
-        self.x_offload[i, j, t]      - binary decision variable
-        self.D_hat_local[i][t]       - precomputed local delay (s)
-        self.D_hat_offload[i][j][t]  - precomputed offload delay (s)
-        self.E_hat_comp[j][i][t]     - precomputed edge energy (J)
-        self.task[i].tau             - deadline (s)
-        self.task[i].active[t]       - activity flag (bool)
-        self.uav[j].E_max           - energy budget (J)
-        self.taskList                - list of task indices
-        self.uavList                 - list of UAV indices
-        self.timeList                - list of time slot indices
-        self.alpha                   - delay weight
-        self.gamma_w                 - energy weight
-        self.M                       - big-M constant
-        self.model                   - Gurobi Model instance
+    LLM 生成的 dynamic_obj_func(self) 可访问的属性：
+        self.x_local[i, t]           - 二进制决策变量（1=本地执行）
+        self.x_offload[i, j, t]      - 二进制决策变量（1=卸载到 UAV j）
+        self.D_hat_local[i][t]       - 预计算本地执行时延（秒）
+        self.D_hat_offload[i][j][t]  - 预计算卸载时延（秒）
+        self.E_hat_comp[j][i][t]     - 预计算边缘计算能耗（焦耳）
+        self.task[i].tau             - 任务截止期（秒）
+        self.task[i].active[t]       - 任务活跃标志（bool）
+        self.uav[j].E_max            - UAV 最大能量预算（焦耳）
+        self.taskList                - 任务索引列表
+        self.uavList                 - UAV 索引列表
+        self.timeList                - 时隙索引列表
+        self.alpha                   - 时延权重
+        self.gamma_w                 - 能耗权重
+        self.M                       - 大 M 常量（线性化用）
+        self.model                   - Gurobi Model 实例
     """
 
     def __init__(self, tasks, uavs, time_list,
@@ -43,53 +42,53 @@ class OffloadingModel:
                  alpha=1.0, gamma_w=1.0,
                  dynamic_obj_func=None):
         """
-        Parameters
+        参数
         ----------
         tasks : dict
-            {i: task_dataclass} with .tau, .active[t], .D_l, .D_r, .F, .index
+            {i: task_dataclass}，属性包括 .tau, .active[t], .D_l, .D_r, .F, .index
         uavs : dict
-            {j: uav_dataclass} with .E_max, .f_max, .pos, .index
+            {j: uav_dataclass}，属性包括 .E_max, .f_max, .pos, .index
         time_list : list
-            Time slot indices.
+            时隙索引列表。
         D_hat_local : dict
-            D_hat_local[i][t] - precomputed local execution delay.
+            D_hat_local[i][t] — 预计算本地执行时延。
         D_hat_offload : dict
-            D_hat_offload[i][j][t] - precomputed remote offloading delay.
+            D_hat_offload[i][j][t] — 预计算远程卸载时延。
         E_hat_comp : dict
-            E_hat_comp[j][i][t] - precomputed edge computing energy.
+            E_hat_comp[j][i][t] — 预计算边缘计算能耗。
         alpha : float
-            Weight for normalized delay term.
+            归一化时延项权重。
         gamma_w : float
-            Weight for normalized energy term.
+            归一化能耗项权重。
         dynamic_obj_func : str or None
-            LLM-generated objective function code (Python string).
+            LLM 生成的目标函数代码（Python 字符串）。
         """
-        # Data storage (use same names that LLM code will access)
+        # 数据存储（属性名与 LLM 生成代码中的访问名保持一致）
         self.task = tasks.copy()
         self.uav = uavs.copy()
         self.taskList = list(tasks.keys())
         self.uavList = list(uavs.keys())
         self.timeList = list(time_list)
 
-        # Precomputed constants
+        # 预计算常量
         self.D_hat_local = D_hat_local
         self.D_hat_offload = D_hat_offload
         self.E_hat_comp = E_hat_comp
 
-        # Weights
+        # 权重系数
         self.alpha = alpha
         self.gamma_w = gamma_w
 
-        # Solver parameters
+        # 求解器参数
         self.M = 100000
         self.gap = 0.05
 
-        # Model and variables (populated in setupVars)
+        # 模型与决策变量（由 setupVars 填充）
         self.model = None
         self.x_local = {}
         self.x_offload = {}
 
-        # Dynamic objective function handling
+        # 动态目标函数处理
         self.error_message = None
         self.string_func = dynamic_obj_func
         self.dynamic_obj_func = dynamic_obj_func
@@ -108,20 +107,20 @@ class OffloadingModel:
                 self.dynamic_obj_func = None
 
     # ------------------------------------------------------------------
-    # Public interface
+    # 公共接口
     # ------------------------------------------------------------------
     def get_latest_func(self):
-        """Return the string form of the current objective function."""
+        """返回当前目标函数的字符串形式。"""
         return self.string_func
 
     def solveProblem(self):
-        """Run the full solve pipeline: init -> vars -> cons -> obj -> optimize.
+        """执行完整求解流程：初始化 → 变量 → 约束 → 目标 → 优化。
 
-        Returns
+        返回
         -------
         feasible : bool
         cost : float
-            Objective value (-1 if infeasible).
+            目标值（不可行时返回 -1）。
         """
         self.initModel()
         self.setupVars()
@@ -148,9 +147,9 @@ class OffloadingModel:
         return False, obj
 
     def getOutputs(self):
-        """Extract offloading decisions from the solved model.
+        """从已求解模型中提取卸载决策结果。
 
-        Returns
+        返回
         -------
         dict
             {t: {"local": [task_ids], "offload": {j: [task_ids]}}}
@@ -185,21 +184,27 @@ class OffloadingModel:
         return result
 
     # ------------------------------------------------------------------
-    # Model building
+    # 模型构建
     # ------------------------------------------------------------------
     def initModel(self):
+        """初始化 Gurobi 模型并设置求解参数。"""
         self.model = gb.Model("Edge UAV Offloading BLP")
         self.model.Params.MIPGap = self.gap
         self.model.setParam("TimeLimit", 10)
 
     def _offload_feasible(self, i, j, t):
-        """Check L1-C2: offloading is feasible only if delay <= deadline."""
+        """检查 L1-C2：卸载时延不超过截止期时才允许卸载。"""
         try:
             return self.D_hat_offload[i][j][t] <= self.task[i].tau
         except (KeyError, IndexError):
             return False
 
     def setupVars(self):
+        """创建二进制决策变量。
+
+        仅为活跃任务创建 x_local；
+        仅为满足截止期约束（L1-C2）的任务-UAV 对创建 x_offload。
+        """
         print("Create Variables for Offloading Model!")
         self.x_local = {}
         self.x_offload = {}
@@ -224,9 +229,14 @@ class OffloadingModel:
         self.model.update()
 
     def setupCons(self):
+        """建立模型约束。
+
+        L1-C1：每个活跃任务在每个时隙必须且只能分配到一个目标（本地或某架 UAV）。
+        L1-C3：若 UAV 设置了最大承载量 N_max，则每时隙分配数不超过上限（可选）。
+        """
         print("Create Constraints for Offloading Model!")
 
-        # (L1-C1) Unique assignment: each active task -> local OR one UAV
+        # (L1-C1) 唯一分配：每个活跃任务 → 本地或某一 UAV
         for i in self.taskList:
             for t in self.timeList:
                 if not self.task[i].active[t]:
@@ -241,7 +251,7 @@ class OffloadingModel:
                     name=f"C1_assign_{i}_{t}",
                 )
 
-        # (L1-C3) Optional UAV capacity per time slot
+        # (L1-C3) 可选 UAV 每时隙承载量上限
         for j in self.uavList:
             cap = getattr(self.uav[j], "N_max", None)
             if cap is None:
@@ -258,16 +268,23 @@ class OffloadingModel:
                 )
 
     # ------------------------------------------------------------------
-    # Objective function
+    # 目标函数
     # ------------------------------------------------------------------
     def setupObj(self):
+        """配置目标函数。
+
+        三分支逻辑：
+        1. 未提供目标函数代码 → 使用默认目标函数
+        2. exec() 转换失败 → 回退到默认目标函数
+        3. exec() 成功 → 调用 LLM 生成的动态目标函数
+        """
         if self.dynamic_obj_func is None:
             if self.string_func is None:
                 print("No dynamic_obj_func found.")
                 self.default_dynamic_obj_func()
                 self.error_message = "None Obj. Using default obj."
             else:
-                # exec() failed during __init__
+                # exec() 在 __init__ 阶段已失败，回退到默认
                 self.default_dynamic_obj_func()
         else:
             try:
@@ -284,12 +301,12 @@ class OffloadingModel:
                 self.default_dynamic_obj_func()
 
     def default_dynamic_obj_func(self):
-        """Standard L1 objective (L1-obj from formula docs).
+        """标准 L1 目标函数（公式文档中的 L1-obj）。
 
-        cost1: normalized delay (local + offload)
-        cost2: normalized edge computing energy
+        cost1：归一化时延（本地执行 + 卸载执行）
+        cost2：归一化边缘计算能耗
         """
-        # Cost 1: weighted normalized delay
+        # 成本项1：加权归一化时延
         cost1 = gb.quicksum(
             self.alpha * self.D_hat_local[i][t] / self.task[i].tau
             * self.x_local[i, t]
@@ -305,7 +322,7 @@ class OffloadingModel:
             if self.task[i].active[t] and (i, j, t) in self.x_offload
         )
 
-        # Cost 2: normalized edge computing energy
+        # 成本项2：归一化边缘计算能耗
         cost2 = gb.quicksum(
             self.gamma_w * self.E_hat_comp[j][i][t] / self.uav[j].E_max
             * self.x_offload[i, j, t]
