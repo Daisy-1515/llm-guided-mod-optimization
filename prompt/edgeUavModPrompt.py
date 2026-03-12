@@ -7,8 +7,8 @@
 四种变异/生成策略：
 
     way1 - 全新生成（完全新的目标函数）
-    way2 - 基于最佳个体的改进（TODO：依赖 OffloadingModel）
-    way3 - 基于最佳个体的结构重构（TODO：依赖 OffloadingModel）
+    way2 - 基于最佳个体的改进（保留 ~50% 结构，精调权重/惩罚项）
+    way3 - 基于最佳个体的结构重构（完全不同的成本分解策略）
     way4 - 资源感知生成（能量 + 负载均衡）
 """
 
@@ -28,6 +28,58 @@ class EdgeUavModPrompts(EdgeUavPrompts):
     def __init__(self, model_path):
         super().__init__(model_path)
         self._setup_template_components()
+
+    # ------------------------------------------------------------------
+    # 格式化工具
+    # ------------------------------------------------------------------
+    @staticmethod
+    def format_best_ind(raw_ind):
+        """将缩减后的个体信息格式化为 LLM 可读的纯文本参考块。
+
+        参数
+        ----------
+        raw_ind : str or dict
+            来自 hsPopulation.shrink_token_size() 的缩减个体。
+            dict 结构: {evaluation_score, simulation_steps: {step: {llm_response, response_format}}}
+        """
+        if isinstance(raw_ind, str):
+            return raw_ind
+        if not isinstance(raw_ind, dict):
+            return str(raw_ind)
+
+        score = raw_ind.get("evaluation_score", "N/A")
+        steps = raw_ind.get("simulation_steps") or {}
+
+        # 倒序遍历，找到最后一次包含有效目标函数的步骤
+        try:
+            sorted_keys = sorted(steps.keys(), key=lambda k: int(k), reverse=True)
+        except (ValueError, TypeError):
+            sorted_keys = sorted(steps.keys(), reverse=True)
+
+        obj_code = ""
+        solver_feedback = "N/A"
+        for key in sorted_keys:
+            step = steps.get(key, {})
+            code = step.get("llm_response", "").strip()
+            if code and "def dynamic_obj_func" in code:
+                obj_code = code
+                solver_feedback = step.get("response_format", "N/A")
+                break
+
+        if not obj_code:
+            obj_code = "(No valid objective code found in previous run)"
+            # 即使无有效代码，仍提取最近的 solver 反馈作为上下文
+            for key in sorted_keys:
+                feedback = steps.get(key, {}).get("response_format", "")
+                if feedback:
+                    solver_feedback = feedback
+                    break
+
+        return (
+            f"Evaluated System Cost: {score}\n"
+            f"Solver Feedback: {solver_feedback}\n"
+            f"Objective Code:\n{obj_code}"
+        )
 
     # ------------------------------------------------------------------
     # 模板组装
@@ -105,10 +157,11 @@ class EdgeUavModPrompts(EdgeUavPrompts):
         参数
         ----------
         best_ind : str or dict
-            上一次运行中的最佳个体描述、代码与适应度。
+            上一次运行中的最佳个体。dict 将由 format_best_ind 格式化。
         instruction : dict
             与 _build_core_prompt 相同结构，包含 "objective_instruction"。
         """
+        formatted_ind = self.format_best_ind(best_ind)
         iter_text = self._iteration_block.format(
             iter=instruction["iteration"]["iter"],
             task_info=instruction.get("task_info", ""),
@@ -124,7 +177,7 @@ class EdgeUavModPrompts(EdgeUavPrompts):
             "Below is one of your previous runs that achieved a good cost score. "
             "Its description, objective code, and evaluated system cost are provided:\n"
             # "【中文注释】以下是一次取得较好成本分数的历史运行。提供了其描述、目标代码与评估后的系统成本：\n"
-            f"{best_ind}\n\n"
+            f"{formatted_ind}\n\n"
             f"{iter_text}"
             f"{instr_text}"
         )
@@ -161,20 +214,23 @@ class EdgeUavModPrompts(EdgeUavPrompts):
         return self._build_core_prompt(self._scenario_block, instruction)
 
     # ------------------------------------------------------------------
-    # 方式 2：基于最佳个体改进（TODO）
+    # 方式 2：基于最佳个体改进
     # ------------------------------------------------------------------
     def get_prompt_way2(self, iter, task_info, uav_info, best_ind):
         """生成用于改进最佳目标函数的提示词。
 
-        TODO: best_ind 的结构依赖 OffloadingModel，尚未实现。
-        该方法为占位符 - 需在 OffloadingModel 可用且
-        个体评估流程（hsIndividualMultiCall）完成适配后补全。
+        保留约 50% 原有结构，精调权重与惩罚项。
 
         参数
         ----------
+        iter : int
+            当前 Harmony Search 迭代索引。
+        task_info : str
+            当前任务状态摘要（活跃任务、紧迫度等）。
+        uav_info : str
+            当前 UAV 状态摘要（位置、能量等）。
         best_ind : str or dict
-            上一代最佳个体。结构待定
-            （将包含 obj_description, obj_code, fitness score）。
+            上一代最佳个体（包含 evaluation_score、obj_code、solver feedback）。
         """
         instruction = {
             "iteration": {"iter": iter},
@@ -196,18 +252,23 @@ class EdgeUavModPrompts(EdgeUavPrompts):
         return self._build_inspirational_prompt(best_ind, instruction)
 
     # ------------------------------------------------------------------
-    # 方式 3：结构性重构（TODO）
+    # 方式 3：结构性重构
     # ------------------------------------------------------------------
     def get_prompt_way3(self, iter, task_info, uav_info, best_ind):
         """生成用于根本性重构目标函数的提示词。
 
-        TODO: 与 way2 相同，依赖 OffloadingModel。
-        该方法为占位符。
+        受历史最佳启发，但采用完全不同的成本分解策略。
 
         参数
         ----------
+        iter : int
+            当前 Harmony Search 迭代索引。
+        task_info : str
+            当前任务状态摘要（活跃任务、紧迫度等）。
+        uav_info : str
+            当前 UAV 状态摘要（位置、能量等）。
         best_ind : str or dict
-            上一代最佳个体。结构待定。
+            上一代最佳个体（包含 evaluation_score、obj_code、solver feedback）。
         """
         instruction = {
             "iteration": {"iter": iter},
