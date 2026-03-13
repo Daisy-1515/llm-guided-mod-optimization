@@ -20,7 +20,7 @@ class EdgeUavModPrompts(EdgeUavPrompts):
 
     用法
     -----
-    >>> prompts = EdgeUavModPrompts(model_path="model/two_level/OffloadingModel.py")
+    >>> prompts = EdgeUavModPrompts(model_path="model/two_level/edgeUavOffloadingModel.py")
     >>> prompts.set_scenario_info(tasks, uavs, time_slots)   # 场景生成后
     >>> text = prompts.get_prompt_way1(iter=3, task_info="...", uav_info="...")
     """

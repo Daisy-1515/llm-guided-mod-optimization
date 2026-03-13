@@ -108,7 +108,7 @@ class generalModel:
 5. 3D空间轨迹连续性约束
 
 **`model/two_level/` 改造**
-- `AssignmentModel.py` → `TaskOffloadingModel.py`
+- `AssignmentModel.py` → `edgeUavOffloadingModel.py`
   - 决策：哪个任务卸载到哪个服务器
 - `SequencingModel.py` → `TrajectoryPlanningModel.py`
   - 决策：无人机3D飞行轨迹
@@ -392,7 +392,7 @@ class hsIndividual:
    - 定义新的决策变量（卸载决策、轨迹）
    - 实现电池、通信、资源约束
 2. 改造 `model/two_level/`
-   - TaskOffloadingModel：任务分配
+   - edgeUavOffloadingModel：任务分配
    - TrajectoryPlanningModel：3D轨迹规划
 3. 测试模型可解性
 
