@@ -1,4 +1,8 @@
-# 项目改造计划：边缘服务器卸载 + 无人机轨迹规划
+# 项目改造计划：边缘计算卸载 + 无人机轨迹规划
+
+> **注意**：本文档为 2026-03-08 初始规划，部分内容已被后续设计决策更新。
+> 以下标注 `[已更新]` 的章节已与实际实现对齐（截至 2026-03-13）。
+> 场景生成器详细设计见 `文档/场景生成器设计方案.md`。
 
 ## 问题场景转换
 
@@ -8,46 +12,36 @@
 - 车辆容量约束
 - 最小化等待时间和行驶距离
 
-### 新场景（Edge Computing + UAV）
-- 无人机执行计算任务卸载
-- 3D空间轨迹规划
-- 电池/载重/计算资源约束
-- 最小化任务延迟、能耗、通信成本
+### 新场景（Edge Computing + UAV）[已更新]
+- 无人机携带计算能力，执行任务卸载（无独立 EdgeServer 实体）
+- 2D 平面轨迹规划（固定飞行高度 H，由全局 config 管理）
+- 电池/计算资源约束
+- 最小化任务延迟、计算能耗、飞行能耗
 
 ---
 
 ## 需要修改的核心模块
 
-### 1. 数据结构层 (`dataCommon.py`)
+### 1. 数据结构层 (`dataCommon.py`) [已更新 ✅]
 
-**必须修改：**
+**实际实现**（2026-03-12）：
 
 ```python
-# 原有类
-class Taxi:          → class UAV (无人机)
-class Passenger:     → class ComputeTask (计算任务)
-class Task:          → class OffloadingTask (卸载任务)
+# 新增类（普通 class，与原项目风格一致）
+class ComputeTask:   # 计算任务（地面终端设备）
+    - index, pos(x,y), D_l, D_r, F, tau
+    - active: defaultdict(bool)  # 时隙活跃标志
+    - f_local                    # 本地 CPU 频率
 
-# 新增类
-class EdgeServer:    # 边缘服务器
-    - server_id
-    - position (x, y, z)
-    - cpu_capacity
-    - memory_capacity
-    - bandwidth
-    - current_load
+class UAV:           # 无人机（携带计算能力，即边缘服务器）
+    - index, pos, pos_final
+    - E_max, f_max, N_max(默认None)
+```
 
-class UAV:           # 无人机
-    - uav_id
-    - position (x, y, z)
-    - battery_level
-    - max_battery
-    - speed
-    - communication_range
-    - payload_capacity
-
-class ComputeTask:   # 计算任务
-    - task_id
+**设计决策**：
+- 不加 EdgeServer 类 — UAV 本身即移动边缘服务器
+- 不加 assigned_uav/trajectory/remaining_energy — 数据类是输入描述，不是状态容器
+- active 用 defaultdict(bool) — 未填充时隙安全返回 False
     - data_size
     - cpu_requirement
     - deadline
@@ -105,13 +99,13 @@ class generalModel:
 2. 通信约束：无人机与服务器距离 ≤ 通信范围
 3. 计算资源约束：服务器负载 ≤ 容量
 4. 任务截止时间约束
-5. 3D空间轨迹连续性约束
+5. 2D 平面轨迹连续性约束（高度 H 固定，不作为变量）
 
-**`model/two_level/` 改造**
-- `AssignmentModel.py` → `edgeUavOffloadingModel.py`
-  - 决策：哪个任务卸载到哪个服务器
-- `SequencingModel.py` → `TrajectoryPlanningModel.py`
-  - 决策：无人机3D飞行轨迹
+**`model/two_level/` 改造** [已更新]
+- `AssignmentModel.py` → `edgeUavOffloadingModel.py` ✅
+  - 决策：哪个任务卸载到哪个 UAV
+- `SequencingModel.py` → `edgeUavTrajectoryResourceModel.py` ⬜
+  - 决策：UAV 2D 轨迹 + CPU 频率分配（BCD+SCA）
 
 **修改原因：** 决策变量、约束条件、优化目标完全不同
 
@@ -372,28 +366,27 @@ class hsIndividual:
 
 ## 实施步骤建议
 
-### 阶段1：数据层改造（1-2天）
-1. 修改 `dataCommon.py`
-   - 定义UAV、EdgeServer、ComputeTask类
-   - 添加3D坐标、电池、计算资源等属性
-2. 准备测试数据
-   - 创建小规模测试场景（3无人机、2服务器、5任务）
+### 阶段1：数据层改造（1-2天）[已完成 ✅ 2026-03-12]
+1. ~~修改 `dataCommon.py`~~
+   - ~~定义UAV、EdgeServer、ComputeTask类~~
+   - 实际：新增 ComputeTask + UAV（无 EdgeServer），普通 class
+2. ~~准备测试数据~~
+   - 测试数据将在阶段2场景生成器中生成
 
-### 阶段2：场景生成（2-3天）
-1. 改造 `scenarioGenerator.py`
-   - 实现无人机、服务器、任务生成逻辑
-   - 定义3D空间范围
-2. 准备输入数据文件
-   - 服务器位置配置
-   - 任务分布参数
+### 阶段2：场景生成（2-3天）[设计完成 📐 2026-03-13]
+1. **新建** `edgeUavScenarioGenerator.py`（不改造原文件，并行共存）
+   - 详细设计见 `文档/场景生成器设计方案.md`
+   - 固定基站方案、连续窗口 active[t]、EdgeUavScenario dataclass
+2. 扩展配置
+   - 3 个新 config 节（edgeUavTask/edgeUavDepot/edgeUavSeed）
 
 ### 阶段3：优化模型（5-7天）
-1. 修改 `model/milpModel.py`
-   - 定义新的决策变量（卸载决策、轨迹）
-   - 实现电池、通信、资源约束
+1. ~~修改 `model/milpModel.py`~~
+   - ~~定义新的决策变量（卸载决策、轨迹）~~
+   - ~~实现电池、通信、资源约束~~
 2. 改造 `model/two_level/`
-   - edgeUavOffloadingModel：任务分配
-   - TrajectoryPlanningModel：3D轨迹规划
+   - edgeUavOffloadingModel：任务分配 ✅
+   - edgeUavTrajectoryResourceModel：2D 轨迹 + CPU 频率（BCD+SCA）⬜
 3. 测试模型可解性
 
 ### 阶段4：仿真环境（3-4天）
@@ -404,12 +397,11 @@ class hsIndividual:
    - 服务器负载管理
 2. 定义新的性能指标
 
-### 阶段5：提示和配置（1-2天）
-1. 修改 `prompt/modPrompt.py`
-   - 编写边缘计算领域提示
-2. 更新 `config/config.py`
-   - 新的默认目标函数
-   - 新的配置参数
+### 阶段5：提示和配置（1-2天）[已完成 ✅ 2026-03-11~12]
+1. ~~修改 `prompt/modPrompt.py`~~
+   - 实际：新建 `edgeUavPrompt.py` + `edgeUavModPrompt.py`（4 种演化策略 way1-way4）
+2. ~~更新 `config/config.py`~~
+   - 已完成：7 节 27 参数
 
 ### 阶段6：集成测试（2-3天）
 1. 端到端测试
@@ -422,12 +414,12 @@ class hsIndividual:
 
 ## 技术挑战和解决方案
 
-### 挑战1：3D轨迹规划复杂度
-**问题：** 3D空间的轨迹规划比2D路径规划复杂得多
+### 挑战1：2D 轨迹规划 + 资源联合优化
+**问题：** 联合优化轨迹和 CPU 频率是非凸 MINLP
 **解决方案：**
-- 使用分层优化：先决定卸载决策，再规划轨迹
-- 考虑使用A*或RRT*算法预处理可行路径
-- 简化模型：离散化时间和空间
+- BCD 解耦：2a 固定轨迹求 f（凸），2b 固定 f 用 SCA 求轨迹
+- 轨迹为 2D 平面（固定高度 H），降低维度
+- 详见 `文档/公式20_两层解耦.md`
 
 ### 挑战2：能耗模型
 **问题：** 无人机能耗与速度、加速度、载重相关，非线性
@@ -481,7 +473,7 @@ y[u,t] ∈ {0,1}    # 无人机u负责任务t
 
 ---
 
-### 3D轨迹规划模型
+### 轨迹规划模型 [注：实际实现为 2D + 固定高度 H]
 
 **决策变量：**
 ```
@@ -525,13 +517,13 @@ v[u,t,dim] ∈ ℝ    # 速度
 ## 总结
 
 ### 核心修改模块（7个）
-1. ✅ `dataCommon.py` - 数据结构
-2. ✅ `scenarioGenerator.py` - 场景生成
-3. ✅ `model/milpModel.py` + `two_level/` - 优化模型
-4. ✅ `simulator/SimClass.py` - 仿真环境
-5. ✅ `prompt/modPrompt.py` - 提示工程
-6. ✅ `config/config.py` - 配置文件
-7. ✅ `inputs/` - 输入数据
+1. ✅ `dataCommon.py` - 数据结构（ComputeTask + UAV，无 EdgeServer）
+2. 📐 `edgeUavScenarioGenerator.py` - 场景生成（设计完成，待实现）
+3. ⬜ `model/two_level/edgeUavTrajectoryResourceModel.py` - Level 2 优化模型（BCD+SCA）
+4. ⬜ `simulator/SimClass.py` - 仿真环境
+5. ✅ `prompt/edgeUavPrompt.py` + `edgeUavModPrompt.py` - 提示工程
+6. ✅ `config/config.py` + `setting.cfg` - 配置文件
+7. ⬜ `inputs/` - 输入数据（由场景生成器产出）
 
 ### 保持不变模块（3个）
 1. ✅ `llmAPI/` - LLM接口
@@ -544,10 +536,8 @@ v[u,t,dim] ∈ ℝ    # 速度
 - LLM提示的领域适配
 - 仿真环境的准确性
 
-**预计工作量：15-22天**
-**技术难度：★★★★☆**
-
 ---
 
 **文档生成时间：** 2026-03-08
+**最后更新：** 2026-03-13（跨文档一致性审查：统一命名、删除 EdgeServer、修正 3D→2D）
 
