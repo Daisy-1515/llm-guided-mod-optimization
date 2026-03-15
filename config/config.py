@@ -81,6 +81,27 @@ class configPara:
         self.E_max = 5000.0     # 能量预算 (J)
         self.f_max = 5e9        # 最大 CPU 频率 (Hz)
 
+        # 任务生成参数
+        self.D_l_min = 5e6              # 上行数据量下界 (bits)
+        self.D_l_max = 5e7              # 上行数据量上界 (bits)
+        self.D_r_min = 1e5              # 下行数据量下界 (bits)
+        self.D_r_max = 1e6              # 下行数据量上界 (bits)
+        self.F_min = 1e8                # CPU 周期数下界 (cycles)
+        self.F_max = 5e9                # CPU 周期数上界 (cycles)
+        self.tau_min = 0.5              # 截止时间下界 (s)
+        self.tau_max = 2.0              # 截止时间上界 (s)
+        self.f_local_default = 1e9      # 终端默认本地 CPU 频率 (Hz)
+        self.active_mode = "contiguous_window"  # 活跃模式
+        self.active_window_min = 5      # 活跃窗口最小长度（时隙数）
+        self.active_window_max = 15     # 活跃窗口最大长度（时隙数）
+
+        # 基站位置
+        self.depot_x = 500.0            # 基站 x 坐标 (m)
+        self.depot_y = 500.0            # 基站 y 坐标 (m)
+
+        # 场景随机种子
+        self.scenario_seed = 42
+
         # 优化权重
         self.alpha = 1.0        # 时延权重
         self.gamma_w = 1.0      # 计算能耗权重
@@ -217,7 +238,28 @@ def dynamic_obj_func(self):
         self.alpha = self.get_config_value('edgeUavWeights', 'alpha', self.alpha, cast=float)
         self.gamma_w = self.get_config_value('edgeUavWeights', 'gamma_w', self.gamma_w, cast=float)
         self.lambda_w = self.get_config_value('edgeUavWeights', 'lambda_w', self.lambda_w, cast=float)
-        
+
+        # 任务生成参数
+        self.D_l_min = self.get_config_value('edgeUavTask', 'D_l_min', self.D_l_min, cast=float)
+        self.D_l_max = self.get_config_value('edgeUavTask', 'D_l_max', self.D_l_max, cast=float)
+        self.D_r_min = self.get_config_value('edgeUavTask', 'D_r_min', self.D_r_min, cast=float)
+        self.D_r_max = self.get_config_value('edgeUavTask', 'D_r_max', self.D_r_max, cast=float)
+        self.F_min = self.get_config_value('edgeUavTask', 'F_min', self.F_min, cast=float)
+        self.F_max = self.get_config_value('edgeUavTask', 'F_max', self.F_max, cast=float)
+        self.tau_min = self.get_config_value('edgeUavTask', 'tau_min', self.tau_min, cast=float)
+        self.tau_max = self.get_config_value('edgeUavTask', 'tau_max', self.tau_max, cast=float)
+        self.f_local_default = self.get_config_value('edgeUavTask', 'f_local_default', self.f_local_default, cast=float)
+        self.active_mode = self.get_config_value('edgeUavTask', 'active_mode', self.active_mode)
+        self.active_window_min = self.get_config_value('edgeUavTask', 'active_window_min', self.active_window_min, cast=int)
+        self.active_window_max = self.get_config_value('edgeUavTask', 'active_window_max', self.active_window_max, cast=int)
+
+        # 基站位置
+        self.depot_x = self.get_config_value('edgeUavDepot', 'depot_x', self.depot_x, cast=float)
+        self.depot_y = self.get_config_value('edgeUavDepot', 'depot_y', self.depot_y, cast=float)
+
+        # 场景随机种子
+        self.scenario_seed = self.get_config_value('edgeUavSeed', 'scenario_seed', self.scenario_seed, cast=int)
+
         # then load environment variables
         self.getEnvInfo()
 
