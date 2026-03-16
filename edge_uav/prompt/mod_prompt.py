@@ -1,5 +1,5 @@
 ﻿"""
-文件: edgeUavModPrompt.py
+文件: edge_uav/prompt/mod_prompt.py
 
 用于 Edge UAV 卸载提示词模板的进化策略。
 
@@ -12,7 +12,7 @@
     way4 - 资源感知生成（能量 + 负载均衡）
 """
 
-from prompt.edgeUavPrompt import EdgeUavPrompts
+from edge_uav.prompt.base_prompt import EdgeUavPrompts
 
 
 class EdgeUavModPrompts(EdgeUavPrompts):
@@ -20,7 +20,7 @@ class EdgeUavModPrompts(EdgeUavPrompts):
 
     用法
     -----
-    >>> prompts = EdgeUavModPrompts(model_path="model/two_level/edgeUavOffloadingModel.py")
+    >>> prompts = EdgeUavModPrompts(model_path="edge_uav/model/offloading.py")
     >>> prompts.set_scenario_info(tasks, uavs, time_slots)   # 场景生成后
     >>> text = prompts.get_prompt_way1(iter=3, task_info="...", uav_info="...")
     """

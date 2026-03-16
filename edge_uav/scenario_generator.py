@@ -1,6 +1,6 @@
-"""Edge UAV 场景生成器骨架。
+"""Edge UAV 场景生成器。
 
-本文件与原有 scenarioGenerator.py 并行共存，不继承原项目中的任何类。
+与原有 scenarioGenerator.py 并行共存，不继承原项目中的任何类。
 当前阶段只冻结类接口、方法签名和主流程调用骨架，具体生成逻辑在后续步骤实现。
 """
 
@@ -9,7 +9,7 @@ from collections import defaultdict
 import numpy as np
 
 from config.config import configPara
-from dataCommon import ComputeTask, UAV, EdgeUavScenario
+from edge_uav.data import ComputeTask, UAV, EdgeUavScenario
 
 
 class EdgeUavScenarioGenerator:

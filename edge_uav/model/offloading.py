@@ -1,5 +1,5 @@
 """
-文件: edgeUavOffloadingModel.py
+文件: edge_uav/model/offloading.py
 
 Edge UAV 计算卸载的 Level-1 二进制线性规划（BLP）。
 

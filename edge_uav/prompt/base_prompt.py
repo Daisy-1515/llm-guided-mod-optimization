@@ -1,5 +1,5 @@
 ﻿"""
-文件: edgeUavPrompt.py
+文件: edge_uav/prompt/base_prompt.py
 
 用于边缘 UAV 计算卸载优化的提示词模板。
 
