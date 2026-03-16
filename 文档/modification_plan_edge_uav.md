@@ -102,7 +102,7 @@ class generalModel:
 5. 2D 平面轨迹连续性约束（高度 H 固定，不作为变量）
 
 **`model/two_level/` 改造** [已更新]
-- `AssignmentModel.py` → `edgeUavOffloadingModel.py` ✅
+- `AssignmentModel.py` → `edge_uav/model/offloading.py` ✅
   - 决策：哪个任务卸载到哪个 UAV
 - `SequencingModel.py` → `edgeUavTrajectoryResourceModel.py` ⬜
   - 决策：UAV 2D 轨迹 + CPU 频率分配（BCD+SCA）
@@ -157,7 +157,7 @@ class SimEnvironment:
 
 **需要修改：**
 
-**`modPrompt.py` → `edgeUavPrompt.py`**
+**`modPrompt.py` → `edge_uav/prompt/base_prompt.py`**
 
 原提示内容需要完全重写：
 
@@ -374,7 +374,7 @@ class hsIndividual:
    - 测试数据将在阶段2场景生成器中生成
 
 ### 阶段2：场景生成（2-3天）[设计完成 📐 2026-03-13]
-1. **新建** `edgeUavScenarioGenerator.py`（不改造原文件，并行共存）
+1. **新建** `edge_uav/scenario_generator.py`（不改造原文件，并行共存）
    - 详细设计见 `文档/场景生成器设计方案.md`
    - 固定基站方案、连续窗口 active[t]、EdgeUavScenario dataclass
 2. 扩展配置
@@ -385,7 +385,7 @@ class hsIndividual:
    - ~~定义新的决策变量（卸载决策、轨迹）~~
    - ~~实现电池、通信、资源约束~~
 2. 改造 `model/two_level/`
-   - edgeUavOffloadingModel：任务分配 ✅
+   - edge_uav/model/offloading.py：任务分配 ✅
    - edgeUavTrajectoryResourceModel：2D 轨迹 + CPU 频率（BCD+SCA）⬜
 3. 测试模型可解性
 
@@ -399,7 +399,7 @@ class hsIndividual:
 
 ### 阶段5：提示和配置（1-2天）[已完成 ✅ 2026-03-11~12]
 1. ~~修改 `prompt/modPrompt.py`~~
-   - 实际：新建 `edgeUavPrompt.py` + `edgeUavModPrompt.py`（4 种演化策略 way1-way4）
+   - 实际：新建 `edge_uav/prompt/base_prompt.py` + `edge_uav/prompt/mod_prompt.py`（4 种演化策略 way1-way4）
 2. ~~更新 `config/config.py`~~
    - 已完成：7 节 27 参数
 
@@ -517,11 +517,11 @@ v[u,t,dim] ∈ ℝ    # 速度
 ## 总结
 
 ### 核心修改模块（7个）
-1. ✅ `dataCommon.py` - 数据结构（ComputeTask + UAV，无 EdgeServer）
-2. 📐 `edgeUavScenarioGenerator.py` - 场景生成（设计完成，待实现）
+1. ✅ `edge_uav/data.py` - 数据结构（ComputeTask + UAV + EdgeUavScenario）
+2. 📐 `edge_uav/scenario_generator.py` - 场景生成（骨架完成，步骤4待实现）
 3. ⬜ `model/two_level/edgeUavTrajectoryResourceModel.py` - Level 2 优化模型（BCD+SCA）
 4. ⬜ `simulator/SimClass.py` - 仿真环境
-5. ✅ `prompt/edgeUavPrompt.py` + `edgeUavModPrompt.py` - 提示工程
+5. ✅ `edge_uav/prompt/base_prompt.py` + `edge_uav/prompt/mod_prompt.py` - 提示工程
 6. ✅ `config/config.py` + `setting.cfg` - 配置文件
 7. ⬜ `inputs/` - 输入数据（由场景生成器产出）
 
