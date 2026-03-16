@@ -122,7 +122,7 @@ class EdgeUavScenarioGenerator:
         Returns:
             时隙索引列表。
         """
-        raise NotImplementedError("步骤4实现")
+        return list(range(T))
 
     def _generate_tasks(
         self, config: configPara, rng: np.random.Generator
@@ -140,7 +140,23 @@ class EdgeUavScenarioGenerator:
         Returns:
             以任务索引为键、ComputeTask 实例为值的字典。
         """
-        raise NotImplementedError("步骤4实现")
+        tasks = {}
+        for i in range(config.numTasks):
+            pos = (
+                float(rng.uniform(0.0, config.x_max)),
+                float(rng.uniform(0.0, config.y_max)),
+            )
+            tasks[i] = ComputeTask(
+                index=i,
+                pos=pos,
+                D_l=float(rng.uniform(config.D_l_min, config.D_l_max)),
+                D_r=float(rng.uniform(config.D_r_min, config.D_r_max)),
+                F=float(rng.uniform(config.F_min, config.F_max)),
+                tau=float(rng.uniform(config.tau_min, config.tau_max)),
+                active=self._generate_active_slots(config, rng),
+                f_local=float(config.f_local_default),
+            )
+        return tasks
 
     def _generate_uavs(self, config: configPara) -> dict[int, UAV]:
         """生成 UAV 集合（固定基站方案）。
@@ -154,7 +170,18 @@ class EdgeUavScenarioGenerator:
         Returns:
             以 UAV 索引为键、UAV 实例为值的字典。
         """
-        raise NotImplementedError("步骤4实现")
+        depot_pos = (float(config.depot_x), float(config.depot_y))
+        uavs = {}
+        for j in range(config.numUAVs):
+            uavs[j] = UAV(
+                index=j,
+                pos=depot_pos,
+                pos_final=depot_pos,
+                E_max=float(config.E_max),
+                f_max=float(config.f_max),
+                N_max=None,
+            )
+        return uavs
 
     def _generate_active_slots(
         self, config: configPara, rng: np.random.Generator
@@ -174,7 +201,15 @@ class EdgeUavScenarioGenerator:
         Returns:
             以时隙索引为键、活跃标志为值的字典（仅包含 True 的条目）。
         """
-        raise NotImplementedError("步骤4实现")
+        if config.active_mode != "contiguous_window":
+            raise ValueError(
+                f"Unsupported active_mode: {config.active_mode!r}"
+            )
+
+        window_len = int(rng.integers(config.active_window_min, config.active_window_max + 1))
+        start = int(rng.integers(0, config.T - window_len + 1))
+
+        return {slot: True for slot in range(start, start + window_len)}
 
     # ------------------------------------------------------------------
     # 辅助方法
@@ -194,7 +229,15 @@ class EdgeUavScenarioGenerator:
         Returns:
             记录场景全局参数的元信息字典。
         """
-        raise NotImplementedError("步骤4实现")
+        return {
+            "T": int(config.T),
+            "delta": float(config.delta),
+            "x_max": float(config.x_max),
+            "y_max": float(config.y_max),
+            "H": float(config.H),
+            "depot_pos": (float(config.depot_x), float(config.depot_y)),
+            "active_mode": config.active_mode,
+        }
 
     # ------------------------------------------------------------------
     # 后置校验
