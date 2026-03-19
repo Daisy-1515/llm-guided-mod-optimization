@@ -21,12 +21,12 @@ class HarmonySearchSolver:
     @class HarmonySearchSolver
     @brief Manages the prompt evolution framework.
     """
-    def __init__(self, configPara, scenarioInfo):
+    def __init__(self, configPara, scenarioInfo, individual_type="multi_call"):
         print("Harmony Search Solver Initialized")
         self.popsize = configPara.popSize
         self.max_generations = configPara.iteration
 
-        self.pop = hsPopulation(configPara, scenarioInfo)
+        self.pop = hsPopulation(configPara, scenarioInfo, individual_type=individual_type)
         self.sort = hsSorting()
 
     def save_population(self, pop, iteration):

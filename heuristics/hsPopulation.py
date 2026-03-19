@@ -25,7 +25,7 @@ class hsPopulation:
     @class hsPopulation
     @brief Manages the the population updates of evolutionary solver.
     """
-    def __init__(self, configPara, scenario, timeout = 300):
+    def __init__(self, configPara, scenario, timeout = 300, individual_type = "multi_call"):
 
         self.config = configPara
         self.scenario = scenario
@@ -33,9 +33,19 @@ class hsPopulation:
         self.HMCR = configPara.HMCR  # Harmony Memory Considering Rate
         self.PAR = configPara.PAR   # Pitch Adjusting Rate
 
+        # Individual class routing
+        if individual_type == "multi_call":
+            self.IndividualClass = hsIndividualMultiCall
+        elif individual_type == "edge_uav":
+            from heuristics.hsIndividualEdgeUav import hsIndividualEdgeUav
+            self.IndividualClass = hsIndividualEdgeUav
+        else:
+            raise ValueError(f"Unsupported individual_type: {individual_type}")
+        self._is_edge_uav = (individual_type == "edge_uav")
+
         self.num_threads = configPara.popSize
         self.interval = configPara.interval
-        self.steps = int(configPara.runTime / self.interval)
+        self.steps = 1 if self._is_edge_uav else int(configPara.runTime / self.interval)
         self.timeout = timeout
 
     def initialize_population(self):
@@ -70,13 +80,16 @@ class hsPopulation:
 
     def get_init_ind(self):
 
-        ind = hsIndividualMultiCall(self.config, self.scenario)
-        ind.runOptModel([""]*self.steps, ["way1"] * self.steps)
+        ind = self.IndividualClass(self.config, self.scenario)
+        if self._is_edge_uav:
+            ind.runOptModel("", "way1")
+        else:
+            ind.runOptModel([""]*self.steps, ["way1"] * self.steps)
         return ind.promptHistory
 
     def get_new_ind(self, pop):
 
-        ind = hsIndividualMultiCall(self.config, self.scenario)
+        ind = self.IndividualClass(self.config, self.scenario)
         p, way = self.generate_new_harmony(pop)
         # arrange prompt to get objective cost
         print("******************start new run***********************")
@@ -105,10 +118,16 @@ class hsPopulation:
                     p.append(parent)
                     way.append("way2")
                 else:
-                    # Pitch adjustment (prompt way 3)]
+                    # Pitch adjustment: Edge UAV may sample way4
                     p.append(parent)
-                    way.append("way3")
+                    if self._is_edge_uav:
+                        way.append(random.choice(["way3", "way4"]))
+                    else:
+                        way.append("way3")
 
+        # Edge UAV: single step → unwrap to scalar
+        if self._is_edge_uav:
+            return p[0], way[0]
         return p, way
 
     def shrink_token_size(self, p):
