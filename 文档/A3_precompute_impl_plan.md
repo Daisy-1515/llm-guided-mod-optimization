@@ -16,11 +16,11 @@
 | S2 | 物理纯函数 | 5 | ✅ 完成 |
 | S3 | 初始化 Helper | 2 | ✅ 完成 |
 | S4 | `Level2Snapshot.validate` | 1 | ✅ 完成 |
-| S5 | `make_initial_level2_snapshot` | 1 | ⬜ 待实现 |
-| S6 | `precompute_offloading_inputs` + 诊断 | 3 | ⬜ 待实现 |
-| S7 | 端到端测试 + Level-1 联调 | — | ⬜ 待开始 |
+| S5 | `make_initial_level2_snapshot` | 1 | ✅ 完成 |
+| S6 | `precompute_offloading_inputs` + 诊断 | 3 | ✅ 完成 |
+| S7 | 端到端测试 + Level-1 联调 | — | ✅ 完成（4 场景，245 行） |
 
-**已实现 9/13 函数，剩余 4 个 + 测试。**
+**全部 13/13 函数已实现，44/44 测试通过。（更新于 2026-03-19）**
 
 ## 依赖关系总览
 
@@ -30,14 +30,14 @@ S1（骨架）           ✅
  ├── S3（初始化 Helper）  ✅ ──┼── Phase 1 全部完成
  └── S4（validate）       ✅ ──┘
                                 ↓
-                           S5（make_initial_level2_snapshot）  ⬜ ← 下一步
+                           S5（make_initial_level2_snapshot）  ✅
                                 ↓
-                           S6（precompute_offloading_inputs + 诊断）  ⬜
+                           S6（precompute_offloading_inputs + 诊断）  ✅
                                 ↓
-                           S7（端到端测试 + Level-1 联调）  ⬜
+                           S7（端到端测试 + Level-1 联调）  ✅
 ```
 
-**当前位置**：Phase 1 全部完成，进入 Phase 2（S5）
+**当前位置**：全部完成（13/13 函数，44/44 测试通过）
 
 ---
 
@@ -532,8 +532,8 @@ assert len(outputs) > 0, "Should have outputs for at least one time slot"
 | 用户 | Phase 1 | S2 物理纯函数 | ✅ 完成 |
 | 用户 | Phase 1 | S3 初始化 Helper | ✅ 完成 |
 | 用户 | Phase 1 | S4 validate | ✅ 完成 |
-| — | Phase 2 | S5 接线 | ⬜ 待实现 |
-| — | Phase 3 | S6 主函数 + 诊断 | ⬜ 待实现 |
-| — | Phase 4 | S7 端到端联调 | ⬜ 待开始 |
+| Claude+Codex | Phase 2 | S5 接线 | ✅ 完成 |
+| Claude+Codex | Phase 3 | S6 主函数 + 诊断 | ✅ 完成 |
+| Claude+Codex | Phase 4 | S7 端到端联调 | ✅ 完成（4 场景，245 行） |
 
-**关键路径**：~~S1 → S2 → S6 → S7~~ → 当前：S5 → S6 → S7
+**全部完成** — 13/13 函数，44/44 测试，commit a567463 + 5e4c2ca

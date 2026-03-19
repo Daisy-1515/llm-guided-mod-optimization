@@ -762,6 +762,6 @@ OffloadingModel 内部访问路径：
 |------|------|------|------|
 | A1 | 分析 offloading.py 输入需求 | — | ✅ 完成 |
 | A2 | 设计预计算模块详细接口 | A1 | ✅ 完成 |
-| A3 | 实现 `edge_uav/model/precompute.py` | A2 | ⬜ 下一步 |
-| A4 | 测试 + 与 Level-1 BLP 联调 | A3 | ⬜ |
-| P2 补 | `底层变量清单.md` 补充预计算常数命名 | A2 | ⬜ |
+| A3 | 实现 `edge_uav/model/precompute.py` | A2 | ✅ 完成（675行，13/13 函数） |
+| A4 | 测试 + 与 Level-1 BLP 联调 | A3 | ✅ 完成（S7 端到端，4 场景，44/44 通过） |
+| P2 补 | `底层变量清单.md` 补充预计算常数命名 | A2 | ⬜ 低优先级 |

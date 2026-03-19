@@ -14,28 +14,32 @@ import tiktoken
 import requests
 
 """
-InterfaceAPI_huggingface provides a request handler for interacting with Hugging Face-hosted LLM APIs.
+InterfaceAPI_huggingface provides a request handler for interacting with
+OpenAI-compatible LLM APIs (HuggingFace, OpenAI, DeepSeek, CloseAI, etc.).
 --------------------
-This implementation is specifically designed and tested for the **DeepSeek-R1-Distill-Qwen-32B** model.
-The `getResponse()` function assumes the model output format includes a `<think>...</think>` reasoning
-block followed by the actual response content.
-
-If you plan to use **other models**, please be aware that:
-    - The response format may differ (e.g., absence of <think> tags or different JSON structures).
-    - You must **implement your own parse function** inside `getResponse()` (or a new subclass)
-    to correctly extract the intended output content from the model's response.
-
-This design ensures flexibility while maintaining model-specific parsing integrity.
+响应解析支持三种格式（自动检测，优先级从高到低）：
+  1. DeepSeek-R1 格式：content 中包含 <think>...</think>，提取 </think> 后的 JSON
+  2. 通用格式：content 中无 <think> 标签，直接从 content 提取 JSON
+  3. 兜底：无法提取 JSON 时，返回原始 content 文本
 """
 
 class InterfaceAPI_huggingface:
     def __init__(self, configInfo):
         self.platform = configInfo.llmPlatform
         self.llmModel = configInfo.llmModel
-        self.api_endpoint = configInfo.api_endpoint
+        self.api_endpoint = self._normalize_endpoint(configInfo.api_endpoint)
         self.api_key = configInfo.api_key
         self.n_trial = configInfo.n_trial
         self.temperature = configInfo.temperature
+
+    @staticmethod
+    def _normalize_endpoint(endpoint):
+        """确保 endpoint 以 /chat/completions 结尾。
+        用户可填 https://xxx/v1 或 https://xxx/v1/chat/completions，均可正常工作。
+        """
+        if endpoint and not endpoint.rstrip("/").endswith("/chat/completions"):
+            return endpoint.rstrip("/") + "/chat/completions"
+        return endpoint
 
     def prepare_header(self):
         headers = {
@@ -61,16 +65,39 @@ class InterfaceAPI_huggingface:
         return payload
 
 
+    def _extract_json(self, text):
+        """从文本中提取最外层 JSON 对象（{...}），找不到则返回 None。"""
+        match = re.search(r'\{.*\}', text, flags=re.DOTALL)
+        return match.group().strip() if match else None
+
+    def _parse_content(self, generated_text):
+        """从 LLM 响应 content 中提取有效负载。
+
+        解析优先级：
+          1. 有 <think> 标签 → 取 </think> 之后的部分，再提取 JSON
+          2. 无 <think> 标签 → 直接从整段 content 提取 JSON
+          3. 都没有 JSON  → 返回原始文本
+        """
+        # 路径 1：DeepSeek-R1 格式（<think>...</think> + 正文）
+        think_match = re.search(r'<think>(.*)', generated_text, flags=re.DOTALL)
+        if think_match:
+            after_think = re.split(r'</think>\s*', think_match.group(1))[-1].strip()
+            json_str = self._extract_json(after_think)
+            if json_str:
+                return json_str
+            # </think> 后无 JSON，回退到整段提取
+            return self._extract_json(generated_text) or after_think
+
+        # 路径 2：通用格式（无 <think> 标签）
+        json_str = self._extract_json(generated_text)
+        if json_str:
+            return json_str
+
+        # 路径 3：兜底，返回原始文本
+        return generated_text
+
     def getResponse(self, prompt):
-        def extract_after_last_think(self, generated_text):
-            parts = re.split(r'</think>\s*', generated_text)
-            return parts[-1] if len(parts) > 1 else ""
-
-
         payload = self.prepare_payload(prompt)
-        #payload_explanation = json.dumps(payload)
-        payload_explanation = payload
-
         headers = self.prepare_header()
 
         response = None
@@ -78,28 +105,18 @@ class InterfaceAPI_huggingface:
         while trial_count < self.n_trial:
             trial_count += 1
             try:
-                response = requests.post(self.api_endpoint, headers=headers, json=payload_explanation)
-                json_data = response.json()
+                raw_resp = requests.post(self.api_endpoint, headers=headers, json=payload)
+                json_data = raw_resp.json()
 
-                # Parse response and return raw text as 'generated_text' field
                 generated_text = json_data["choices"][0]["message"]["content"]
                 if generated_text:
-                    match = re.search(r'<think>(.*)', generated_text, flags=re.DOTALL)
-
-                    if match:
-                        # Look for content after </think> symbol
-                        extracted_text = match.group(1).strip()  # Extract content after </think>
-                        json_match = re.search(r'\{.*\}', extracted_text, flags=re.DOTALL)
-                        if json_match:
-                            response = json_match.group().strip()  # Extract JSON content
-                            print(response)
-                        else:
-                            response = extracted_text  # If no JSON found, return the extracted text
+                    response = self._parse_content(generated_text)
+                    print(response)
                 else:
                     response = json_data.get("error", "No generated_text or error field found")
-                break  # If successful, break out of the loop
+                break
             except Exception as e:
                 print(f"API Connection Fails! Error: {e}. Will try to reconnect!")
-                time.sleep(2)  # Optionally wait for 2 seconds before retrying
+                time.sleep(2)
 
         return response

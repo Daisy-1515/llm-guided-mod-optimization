@@ -373,29 +373,33 @@ class hsIndividual:
 2. ~~准备测试数据~~
    - 测试数据将在阶段2场景生成器中生成
 
-### 阶段2：场景生成（2-3天）[设计完成 📐 2026-03-13]
+### 阶段2：场景生成（2-3天）[已完成 ✅ 2026-03-16]
 1. **新建** `edge_uav/scenario_generator.py`（不改造原文件，并行共存）
    - 详细设计见 `文档/场景生成器设计方案.md`
    - 固定基站方案、连续窗口 active[t]、EdgeUavScenario dataclass
 2. 扩展配置
    - 3 个新 config 节（edgeUavTask/edgeUavDepot/edgeUavSeed）
 
-### 阶段3：优化模型（5-7天）
+### 阶段3：优化模型（5-7天）[部分完成]
 1. ~~修改 `model/milpModel.py`~~
    - ~~定义新的决策变量（卸载决策、轨迹）~~
    - ~~实现电池、通信、资源约束~~
 2. 改造 `model/two_level/`
-   - edge_uav/model/offloading.py：任务分配 ✅
-   - edgeUavTrajectoryResourceModel：2D 轨迹 + CPU 频率（BCD+SCA）⬜
-3. 测试模型可解性
+   - edge_uav/model/offloading.py：Level-1 BLP 任务分配 ✅（340行）
+   - edge_uav/model/precompute.py：预计算模块 ✅（675行，13/13 函数）
+   - edge_uav/model/evaluator.py：固定评估器 ✅（190行，8/8 测试）
+   - edgeUavTrajectoryResourceModel：Level-2 轨迹 + CPU 频率（BCD+SCA）⬜
+3. 测试模型可解性 — S7 端到端测试 ✅（4 场景，44/44 通过）
 
-### 阶段4：仿真环境（3-4天）
-1. 重写 `simulator/SimClass.py`
-   - 3D位置更新
-   - 能耗计算
-   - 通信可行性检查
-   - 服务器负载管理
-2. 定义新的性能指标
+### 阶段4：HS 个体适配 + 框架集成 [已完成 ✅ 2026-03-19]
+> 原计划为"仿真环境"，经架构决策确认 Edge UAV 不需要 SimEnvironment（一次性求解，非在线调度）。
+> 实际改为 HS 个体适配（Phase④ S1-S6），62/62 测试通过。
+
+1. ✅ `edge_uav/model/evaluator.py`（190行）— 固定评估器
+2. ✅ `heuristics/hsIndividualEdgeUav.py`（302行）— Edge UAV 个体
+3. ✅ `heuristics/hsPopulation.py` + `hsFrame.py` — 框架接入 Edge UAV + way4
+4. ✅ `testEdgeUav.py`（23行）— Edge UAV 入口脚本
+5. ✅ 4 个测试文件（609行）— evaluator + individual + smoke + integration
 
 ### 阶段5：提示和配置（1-2天）[已完成 ✅ 2026-03-11~12]
 1. ~~修改 `prompt/modPrompt.py`~~
@@ -514,21 +518,31 @@ v[u,t,dim] ∈ ℝ    # 速度
 
 ---
 
-## 总结
+## 总结（更新于 2026-03-19）
 
-### 核心修改模块（7个）
-1. ✅ `edge_uav/data.py` - 数据结构（ComputeTask + UAV + EdgeUavScenario）
-2. 📐 `edge_uav/scenario_generator.py` - 场景生成（骨架完成，步骤4待实现）
-3. ⬜ `model/two_level/edgeUavTrajectoryResourceModel.py` - Level 2 优化模型（BCD+SCA）
-4. ⬜ `simulator/SimClass.py` - 仿真环境
-5. ✅ `edge_uav/prompt/base_prompt.py` + `edge_uav/prompt/mod_prompt.py` - 提示工程
-6. ✅ `config/config.py` + `setting.cfg` - 配置文件
-7. ⬜ `inputs/` - 输入数据（由场景生成器产出）
+### 已完成模块
+1. ✅ `edge_uav/data.py` (353行) — 数据结构（ComputeTask + UAV + EdgeUavScenario）
+2. ✅ `edge_uav/scenario_generator.py` (474行) — 场景生成器（39/39 测试）
+3. ✅ `edge_uav/prompt/base_prompt.py` + `mod_prompt.py` — 提示工程（way1-way4）
+4. ✅ `edge_uav/model/offloading.py` (340行) — Level-1 BLP 卸载模型
+5. ✅ `edge_uav/model/precompute.py` (675行) — 预计算模块（13/13 函数）
+6. ✅ `edge_uav/model/evaluator.py` (190行) — 固定评估器（8/8 测试）
+7. ✅ `heuristics/hsIndividualEdgeUav.py` (302行) — Edge UAV HS 个体
+8. ✅ `heuristics/hsPopulation.py` (157行) + `hsFrame.py` (56行) — 框架接入 Edge UAV
+9. ✅ `config/config.py` (307行) — 10 节 42 参数
+10. ✅ `testEdgeUav.py` (23行) — Edge UAV 入口脚本
 
-### 保持不变模块（3个）
-1. ✅ `llmAPI/` - LLM接口
-2. ✅ `heuristics/hsFrame.py` - 和声搜索框架
-3. ✅ `testAll.py` - 主入口（基本不变）
+### 待实现模块
+1. ⬜ `edgeUavTrajectoryResourceModel.py` — Level 2 优化模型（BCD+SCA）
+2. ⬜ 完整 pipeline 集成（LLM API + HS 全链路）
+
+### 不需要的模块（架构决策）
+1. N/A `simulator/SimClass.py` — Edge UAV 不需要仿真环境（一次性求解）
+2. N/A `inputs/` — 由场景生成器在内存中产出
+
+### 保持不变模块
+1. ✅ `llmAPI/` — LLM 接口
+2. ✅ `testAll.py` — 原 MoD 入口（双轨制并行共存）
 
 ### 关键成功因素
 - 优化模型的正确建模（最关键）
@@ -539,5 +553,5 @@ v[u,t,dim] ∈ ℝ    # 速度
 ---
 
 **文档生成时间：** 2026-03-08
-**最后更新：** 2026-03-13（跨文档一致性审查：统一命名、删除 EdgeServer、修正 3D→2D）
+**最后更新：** 2026-03-19（Phase①~④ 全部完成，62/62 测试，同步更新总结和阶段状态）
 

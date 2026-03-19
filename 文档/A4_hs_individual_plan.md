@@ -72,7 +72,7 @@ def evaluate_solution(outputs, precompute_result, scenario) -> float:
 | 组件 | 文件 | 行数 | 复用? | 说明 |
 |------|------|------|-------|------|
 | 顶层框架 | `hsFrame.py` | 56 | ✅ | 通用迭代循环 |
-| 种群管理 | `hsPopulation.py` | 138 | ⚠️ | 可复用，但需接 way4 + Edge UAV 分支 |
+| 种群管理 | `hsPopulation.py` | 157 | ✅ | 已接 way4 + Edge UAV 分支（S3 完成） |
 | 基础个体 | `hsIndividual.py` | 113 | ❌ | 绑定 Taxi/Passenger，需 Edge UAV 版 |
 | 完整个体 | `hsIndividualMultiCall.py` | 127 | ❌ | 绑定 SimEnvironment，需 Edge UAV 版 |
 | 种群排序 | `hsSorting.py` | 89 | ✅ | 完全通用 |
@@ -106,10 +106,10 @@ def evaluate_solution(outputs, precompute_result, scenario) -> float:
 - 固定公式，不随 LLM 变化 → 不同目标函数可公平比较
 
 验收：
-- [ ] 用 S7 Test B 的 outputs 调用评估器，得到合理分数
-- [ ] 全本地 outputs 分数 > 混合卸载 outputs 分数
+- [x] 用 S7 Test B 的 outputs 调用评估器，得到合理分数 ✅
+- [x] 全本地 outputs 分数 > 混合卸载 outputs 分数 ✅（8/8 测试通过，commit 0ead52b）
 
-### S2: 创建 hsIndividualEdgeUav.py（~150-200 行）
+### S2: 创建 hsIndividualEdgeUav.py（实际 302 行）
 
 **产出**：`heuristics/hsIndividualEdgeUav.py`
 
@@ -129,8 +129,8 @@ def evaluate_solution(outputs, precompute_result, scenario) -> float:
 依赖：S1 (评估器)
 
 验收：
-- [ ] 用默认 obj（不调 LLM）单个体跑通，得到合理 promptHistory
-- [ ] 能正确路由 way1/2/3/4
+- [x] 用默认 obj（不调 LLM）单个体跑通，得到合理 promptHistory ✅
+- [x] 能正确路由 way1/2/3/4 ✅（3/3 测试通过，commit 8fd9322）
 
 ### S3: 修改 hsPopulation.py 支持 Edge UAV（小改）
 
@@ -142,8 +142,8 @@ def evaluate_solution(outputs, precompute_result, scenario) -> float:
 依赖：S2
 
 验收：
-- [ ] `generate_new_harmony` 能产出 way4
-- [ ] 双轨制：原 MoD 链路不受影响
+- [x] `generate_new_harmony` 能产出 way4 ✅
+- [x] 双轨制：原 MoD 链路不受影响 ✅（62/62 测试通过，commit 57af7ee）
 
 ### S4: 创建入口 testEdgeUav.py（~30 行）
 
@@ -179,7 +179,7 @@ def evaluate_solution(outputs, precompute_result, scenario) -> float:
 
 ## 注意事项
 
-1. **hsPopulation.generate_new_harmony() 只产出 way1/2/3**，不会采样 way4 → S3 需要一起接线
+1. ~~**hsPopulation.generate_new_harmony() 只产出 way1/2/3**~~ → 已修复（S3，`random.choice(["way3","way4"])` for Edge UAV）
 2. **prompt 调用次数**：原项目每个个体调 `steps` 次 LLM，Edge UAV 只需 **1 次**
 3. **LLM API 配置**：需要 `config/env/.env` 中有可用 endpoint
 4. **双轨制**：原 MoD 链路必须保持可用
