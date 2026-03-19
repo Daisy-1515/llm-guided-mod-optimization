@@ -18,7 +18,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from heuristics.hsIndividual import hsIndividual
 from heuristics.hsIndividualMultiCall import hsIndividualMultiCall
 import heuristics.hsUtils as hsUtils
-import sys
 
 class hsPopulation:
     """
@@ -52,13 +51,13 @@ class hsPopulation:
         results = []
         try:
             with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
-                # Submit tasks to the thread pool
                 futures = [executor.submit(self.get_init_ind) for _ in range(self.popsize)]
-                results = [future.result() for future in as_completed(futures)]
+                results = [
+                    future.result()
+                    for future in as_completed(futures, timeout=self.timeout)
+                ]
         except Exception as e:
-            print(f"Error: {e}")
-            print("Parallel time out .")
-            sys.exit(0)
+            raise RuntimeError(f"initialize_population failed: {e}") from e
 
         return results
 
@@ -68,13 +67,13 @@ class hsPopulation:
 
         try:
             with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
-                # Submit tasks to the thread pool
                 futures = [executor.submit(self.get_new_ind, pop) for _ in range(self.popsize)]
-                results = [future.result() for future in as_completed(futures)]
+                results = [
+                    future.result()
+                    for future in as_completed(futures, timeout=self.timeout)
+                ]
         except Exception as e:
-            print(f"Error: {e}")
-            print("Parallel time out .")
-            sys.exit(0)
+            raise RuntimeError(f"generate_new_population failed: {e}") from e
 
         return results
 
@@ -150,8 +149,6 @@ class hsPopulation:
                 shrinked_p['simulation_steps'][key]['response_format'] = p['simulation_steps'][key]['response_format'] 
 
         except Exception as e:
-            print(f"Error: {e}")
-            print(f"{shrinked_p}")
-            sys.exit(0)
+            raise RuntimeError(f"shrink_token_size failed: {e}\n{shrinked_p}") from e
 
         return shrinked_p

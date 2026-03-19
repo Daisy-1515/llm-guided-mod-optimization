@@ -9,12 +9,21 @@
 @brief This module retrieves basic config information.
 """
 
+from pathlib import Path
+
 from configobj import ConfigObj
 import os
 from dotenv import load_dotenv
 
 class configPara:
     def __init__(self, config_file, env_file):
+        # 自动定位配置文件（支持 configPara(None, None) 的懒调用）
+        repo_root = Path(__file__).resolve().parents[1]
+        if config_file is None:
+            config_file = str(repo_root / "config" / "setting.cfg")
+        if env_file is None:
+            env_file = str(repo_root / "config" / "env" / ".env")
+
         # llm
         self.llmPlatform = None
         self.llmModel = None

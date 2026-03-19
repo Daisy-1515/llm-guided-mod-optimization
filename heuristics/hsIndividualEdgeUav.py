@@ -183,6 +183,8 @@ class hsIndividualEdgeUav:
             "feasible": False,
             "solver_cost": float(INVALID_OUTPUT_PENALTY),
             "used_default_obj": True,
+            "llm_status": "default",
+            "llm_error": None,
         }
 
     def getNewPrompt(self, parent, way):
@@ -218,11 +220,14 @@ class hsIndividualEdgeUav:
             raw_response = str(self._ensure_api().getResponse(prompt_text))
         except Exception as exc:
             print(f"[hsIndividualEdgeUav] LLM API error: {exc}")
+            full_info["llm_status"] = "api_error"
+            full_info["llm_error"] = str(exc)
             return full_info["llm_response"], full_info
 
         full_info["raw_llm_response"] = raw_response
         full_info["llm_response"] = raw_response
         full_info["used_default_obj"] = False
+        full_info["llm_status"] = "ok"
         return raw_response, full_info
 
     # ------------------------------------------------------------------
@@ -257,6 +262,8 @@ class hsIndividualEdgeUav:
                 extract_failed = True
                 full_info["llm_response"] = self._synthesize_llm_response()
                 full_info["used_default_obj"] = True
+                full_info["llm_status"] = "parse_error"
+                full_info["llm_error"] = f"extract_code_hsIndiv returned empty for way={way}"
 
         # 3) 求解 Level-1 BLP
         model = OffloadingModel(

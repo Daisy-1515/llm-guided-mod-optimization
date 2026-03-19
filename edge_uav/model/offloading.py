@@ -11,6 +11,8 @@ Edge UAV 计算卸载的 Level-1 二进制线性规划（BLP）。
 与原项目 AssignmentModel.py 的注入模式一致。
 """
 
+import os
+import threading
 import time
 
 import gurobipy as gb
@@ -135,7 +137,9 @@ class OffloadingModel:
 
         if self.model.status == gb.GRB.INFEASIBLE:
             self.model.computeIIS()
-            self.model.write("offloading_model.ilp")
+            ts = int(time.time() * 1000) % 1_000_000
+            ilp_name = f"offloading_model_{os.getpid()}_{threading.get_ident()}_{ts}.ilp"
+            self.model.write(ilp_name)
             return False, -1
 
         obj = self.model.objVal

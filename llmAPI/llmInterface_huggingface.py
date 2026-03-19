@@ -31,6 +31,7 @@ class InterfaceAPI_huggingface:
         self.api_key = configInfo.api_key
         self.n_trial = configInfo.n_trial
         self.temperature = configInfo.temperature
+        self.request_timeout = 60
 
     @staticmethod
     def _normalize_endpoint(endpoint):
@@ -100,23 +101,31 @@ class InterfaceAPI_huggingface:
         payload = self.prepare_payload(prompt)
         headers = self.prepare_header()
 
-        response = None
+        last_error = None
         trial_count = 0
         while trial_count < self.n_trial:
             trial_count += 1
             try:
-                raw_resp = requests.post(self.api_endpoint, headers=headers, json=payload)
+                raw_resp = requests.post(
+                    self.api_endpoint, headers=headers, json=payload,
+                    timeout=self.request_timeout,
+                )
+                raw_resp.raise_for_status()
                 json_data = raw_resp.json()
 
                 generated_text = json_data["choices"][0]["message"]["content"]
                 if generated_text:
                     response = self._parse_content(generated_text)
                     print(response)
+                    return response
                 else:
-                    response = json_data.get("error", "No generated_text or error field found")
-                break
+                    error_msg = json_data.get("error", "No generated_text or error field found")
+                    raise RuntimeError(f"LLM returned empty content: {error_msg}")
             except Exception as e:
-                print(f"API Connection Fails! Error: {e}. Will try to reconnect!")
+                last_error = e
+                print(f"API Connection Fails! Error: {e}. Trial {trial_count}/{self.n_trial}")
                 time.sleep(2)
 
-        return response
+        raise RuntimeError(
+            f"LLM API failed after {self.n_trial} retries. Last error: {last_error}"
+        )

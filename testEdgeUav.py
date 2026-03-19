@@ -10,6 +10,20 @@ from heuristics.hsFrame import HarmonySearchSolver
 
 if __name__ == "__main__":
     params = configPara(None, None)
+    params.getConfigInfo()
+
+    # 试跑参数覆盖
+    params.popSize = 3
+    params.iteration = 3
+
+    # 启动前诊断
+    print(f"[testEdgeUav] model={params.llmModel}, endpoint={params.api_endpoint}")
+    print(f"[testEdgeUav] popSize={params.popSize}, iteration={params.iteration}")
+
+    if not params.api_key or not params.api_endpoint:
+        raise RuntimeError(
+            "LLM config missing. Check config/setting.cfg + config/env/.env"
+        )
 
     gen = EdgeUavScenarioGenerator()
     scenario = gen.getScenarioInfo(params)
