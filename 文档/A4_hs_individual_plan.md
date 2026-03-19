@@ -188,7 +188,16 @@ def evaluate_solution(outputs, precompute_result, scenario) -> float:
 
 ## 后续 Phase
 
-### Phase ⑤: Level-2 BCD 循环（P1，可延后）
+### Phase ⑤-前置：完整 Pipeline 首次试跑（P0，先于 BCD 循环）
+
+> 详细计划见：`文档/首次试跑计划_Phase5_pipeline.md`
+> 状态：**已批准，待执行（2026-03-19）**
+
+执行顺序：A（提交加固）→ B（可观测性）→ C/D（预飞）→ E（1×1 → 3×3 试跑）→ F（分析）
+
+成功判据：至少 1/3 个体 llm_status=ok + used_default_obj=false + 至少 1 个 feasible=true
+
+### Phase ⑤-后续: Level-2 BCD 循环（可延后至试跑成功后）
 
 | 步骤 | 内容 |
 |------|------|
