@@ -31,7 +31,7 @@ class InterfaceAPI_huggingface:
         self.api_key = configInfo.api_key
         self.n_trial = configInfo.n_trial
         self.temperature = configInfo.temperature
-        self.request_timeout = 60
+        self.request_timeout = 120
 
     @staticmethod
     def _normalize_endpoint(endpoint):
