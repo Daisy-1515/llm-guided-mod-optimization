@@ -63,7 +63,6 @@ class hsPopulation:
 
     def generate_new_population(self, pop):
         results = []
-        print("******************start new iteration***********************")
 
         try:
             with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
@@ -91,7 +90,6 @@ class hsPopulation:
         ind = self.IndividualClass(self.config, self.scenario)
         p, way = self.generate_new_harmony(pop)
         # arrange prompt to get objective cost
-        print("******************start new run***********************")
         ind.runOptModel(p, way)
 
         return ind.promptHistory

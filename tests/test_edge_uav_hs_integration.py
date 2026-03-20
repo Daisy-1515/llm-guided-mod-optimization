@@ -132,7 +132,7 @@ def test_t4_save_population_json(hs_bundle, tmp_path, monkeypatch):
 
     solver.save_population(sorted_pop, 0)
 
-    json_path = tmp_path / "discussion" / "population_result_0.json"
+    json_path = tmp_path / solver.out_dir / "population_result_0.json"
     assert json_path.exists()
 
     with open(json_path) as f:
