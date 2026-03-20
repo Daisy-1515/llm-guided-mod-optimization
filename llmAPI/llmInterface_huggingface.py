@@ -32,6 +32,8 @@ class InterfaceAPI_huggingface:
         self.n_trial = configInfo.n_trial
         self.temperature = configInfo.temperature
         self.request_timeout = 120
+        self._session = requests.Session()
+        self._session.trust_env = False  # 绕过 Windows 注册表代理
 
     @staticmethod
     def _normalize_endpoint(endpoint):
@@ -106,7 +108,7 @@ class InterfaceAPI_huggingface:
         while trial_count < self.n_trial:
             trial_count += 1
             try:
-                raw_resp = requests.post(
+                raw_resp = self._session.post(
                     self.api_endpoint, headers=headers, json=payload,
                     timeout=self.request_timeout,
                 )
