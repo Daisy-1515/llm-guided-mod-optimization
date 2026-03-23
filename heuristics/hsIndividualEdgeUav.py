@@ -21,6 +21,13 @@ from edge_uav.model.precompute import (
     precompute_offloading_inputs,
 )
 from edge_uav.prompt.mod_prompt import EdgeUavModPrompts
+from heuristics.hs_way_constants import (
+    VALID_EDGE_UAV_WAYS,
+    WAY_CROSS,
+    WAY_MEMORY,
+    WAY_PITCH,
+    WAY_RANDOM,
+)
 from heuristics.hsUtils import extract_code_hsIndiv
 
 
@@ -72,7 +79,7 @@ class hsIndividualEdgeUav:
         - promptHistory             — 种群排序 / shrink / format_best_ind 读取
     """
 
-    def __init__(self, configPara, scenario):
+    def __init__(self, configPara, scenario, *, shared_precompute=None):
         self.config = configPara
         self.scenario = scenario
         self.iter_idx = 0
@@ -88,12 +95,17 @@ class hsIndividualEdgeUav:
         )
         self.prompt.refresh_scenario_block()
 
-        # 预计算（一次性完成）
-        self.params = PrecomputeParams.from_config(configPara)
-        self.snapshot = make_initial_level2_snapshot(scenario)
-        self.precompute_result = precompute_offloading_inputs(
-            scenario, self.params, self.snapshot,
-        )
+        # 预计算：外部传入时直接引用（避免重复计算），否则自行计算
+        if shared_precompute is not None:
+            self.params = None
+            self.snapshot = None
+            self.precompute_result = shared_precompute
+        else:
+            self.params = PrecomputeParams.from_config(configPara)
+            self.snapshot = make_initial_level2_snapshot(scenario)
+            self.precompute_result = precompute_offloading_inputs(
+                scenario, self.params, self.snapshot,
+            )
 
         # LLM API（延迟初始化）
         self._api = None
@@ -126,6 +138,8 @@ class hsIndividualEdgeUav:
             parent = ""
         if not way:
             way = "default"
+        elif way != "default" and way not in VALID_EDGE_UAV_WAYS:
+            raise ValueError(f"Unsupported edge_uav way: {way}")
         return parent, str(way)
 
     def _synthesize_llm_response(self):
@@ -196,19 +210,19 @@ class hsIndividualEdgeUav:
             return full_info["llm_response"], full_info
 
         # LLM 路由
-        if way == "way1":
+        if way == WAY_RANDOM:
             prompt_text = self.prompt.get_prompt_way1(
                 self.iter_idx, task_info, uav_info,
             )
-        elif way == "way2":
+        elif way == WAY_MEMORY:
             prompt_text = self.prompt.get_prompt_way2(
                 self.iter_idx, task_info, uav_info, parent,
             )
-        elif way == "way3":
+        elif way == WAY_PITCH:
             prompt_text = self.prompt.get_prompt_way3(
                 self.iter_idx, task_info, uav_info, parent,
             )
-        elif way == "way4":
+        elif way == WAY_CROSS:
             prompt_text = self.prompt.get_prompt_way4(
                 self.iter_idx, task_info, uav_info,
             )
@@ -242,7 +256,7 @@ class hsIndividualEdgeUav:
     def runOptModel(self, parent, way):
         """normalize → prompt → extract → solve → evaluate → record。"""
         parent, way = self._normalize_inputs(parent, way)
-        is_default = way not in {"way1", "way2", "way3", "way4"}
+        is_default = way not in VALID_EDGE_UAV_WAYS
 
         # 1) 获取 prompt / LLM 回复
         response_text, full_info = self.getNewPrompt(parent, way)

@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from heuristics.hsIndividual import hsIndividual
 from heuristics.hsIndividualMultiCall import hsIndividualMultiCall
 import heuristics.hsUtils as hsUtils
+from heuristics.hs_way_constants import WAY_CROSS, WAY_MEMORY, WAY_PITCH, WAY_RANDOM
 
 class hsPopulation:
     """
@@ -42,52 +43,67 @@ class hsPopulation:
             raise ValueError(f"Unsupported individual_type: {individual_type}")
         self._is_edge_uav = (individual_type == "edge_uav")
 
+        # Edge UAV: 预计算一次，共享给所有个体（只读，线程安全）
+        self._shared_precompute = None
+        if self._is_edge_uav:
+            from edge_uav.model.precompute import (
+                PrecomputeParams,
+                make_initial_level2_snapshot,
+                precompute_offloading_inputs,
+            )
+            params = PrecomputeParams.from_config(configPara)
+            snapshot = make_initial_level2_snapshot(scenario)
+            self._shared_precompute = precompute_offloading_inputs(
+                scenario, params, snapshot,
+            )
+
         self.num_threads = configPara.popSize
         self.interval = configPara.interval
         self.steps = 1 if self._is_edge_uav else int(configPara.runTime / self.interval)
         self.timeout = timeout
 
+    def _run_parallel(self, fn, *args):
+        """并行执行 fn(*args) popsize 次，收集结果。"""
+        with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
+            futures = [executor.submit(fn, *args) for _ in range(self.popsize)]
+            return [
+                future.result()
+                for future in as_completed(futures, timeout=self.timeout)
+            ]
+
     def initialize_population(self):
-        results = []
         try:
-            with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
-                futures = [executor.submit(self.get_init_ind) for _ in range(self.popsize)]
-                results = [
-                    future.result()
-                    for future in as_completed(futures, timeout=self.timeout)
-                ]
+            return self._run_parallel(self.get_init_ind)
         except Exception as e:
             raise RuntimeError(f"initialize_population failed: {e}") from e
 
-        return results
-
     def generate_new_population(self, pop):
-        results = []
-
         try:
-            with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
-                futures = [executor.submit(self.get_new_ind, pop) for _ in range(self.popsize)]
-                results = [
-                    future.result()
-                    for future in as_completed(futures, timeout=self.timeout)
-                ]
+            return self._run_parallel(self.get_new_ind, pop)
         except Exception as e:
             raise RuntimeError(f"generate_new_population failed: {e}") from e
 
-        return results
+    def _make_individual(self):
+        """创建个体实例，edge_uav 模式下传入共享预计算结果。"""
+        if self._is_edge_uav:
+            return self.IndividualClass(
+                self.config, self.scenario,
+                shared_precompute=self._shared_precompute,
+            )
+        return self.IndividualClass(self.config, self.scenario)
 
     def get_init_ind(self):
 
-        ind = self.IndividualClass(self.config, self.scenario)
+        ind = self._make_individual()
         if self._is_edge_uav:
-            ind.runOptModel("", "way1")
+            ind.runOptModel("", WAY_RANDOM)
         else:
-            ind.runOptModel([""]*self.steps, ["way1"] * self.steps)
+            ind.runOptModel([""]*self.steps, [WAY_RANDOM] * self.steps)
         return ind.promptHistory
 
     def get_new_ind(self, pop):
 
-        ind = self.IndividualClass(self.config, self.scenario)
+        ind = self._make_individual()
         p, way = self.generate_new_harmony(pop)
         # arrange prompt to get objective cost
         ind.runOptModel(p, way)
@@ -103,7 +119,7 @@ class hsPopulation:
             if random.random() >= self.HMCR:
                 # Random generation
                 p.append("")
-                way.append("way1")
+                way.append(WAY_RANDOM)
             else:
                 # Memory consideration
                 idx = random.randint(0, rd - 1) if rd > 2 else 0
@@ -113,14 +129,14 @@ class hsPopulation:
                 if random.random() > self.PAR:
                     # prompt way 2
                     p.append(parent)
-                    way.append("way2")
+                    way.append(WAY_MEMORY)
                 else:
                     # Pitch adjustment: Edge UAV may sample way4
                     p.append(parent)
                     if self._is_edge_uav:
-                        way.append(random.choice(["way3", "way4"]))
+                        way.append(random.choice([WAY_PITCH, WAY_CROSS]))
                     else:
-                        way.append("way3")
+                        way.append(WAY_PITCH)
 
         # Edge UAV: single step → unwrap to scalar
         if self._is_edge_uav:

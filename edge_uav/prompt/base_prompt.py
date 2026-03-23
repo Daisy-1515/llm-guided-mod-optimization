@@ -7,7 +7,23 @@
 所有五个提示词组件都为“边缘计算 + UAV”场景从零构建。
 """
 
+from functools import lru_cache
 from pathlib import Path
+
+
+@lru_cache(maxsize=None)
+def _read_model_source_cached(model_path: str) -> str:
+    """读取模型源码并缓存，避免多个个体重复读磁盘。"""
+    try:
+        return Path(model_path).read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return (
+            "[OffloadingModel source not yet available]\n"
+            "The model file will be created at: " + model_path + "\n"
+            "For now, refer to the structured explanation below."
+        )
+    except Exception as exc:
+        return f"[Error reading model source: {exc}]"
 
 
 class EdgeUavPrompts:
@@ -202,16 +218,7 @@ class EdgeUavPrompts:
 
     def _read_model_source(self):
         """读取 OffloadingModel 源码并嵌入提示词。"""
-        try:
-            return Path(self.model_path).read_text(encoding="utf-8").strip()
-        except FileNotFoundError:
-            return (
-                "[OffloadingModel source not yet available]\n"
-                "The model file will be created at: " + str(self.model_path) + "\n"
-                "For now, refer to the structured explanation below."
-            )
-        except Exception as exc:
-            return f"[Error reading model source: {exc}]"
+        return _read_model_source_cached(str(self.model_path))
 
     # ------------------------------------------------------------------
     # 4. 输出格式

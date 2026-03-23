@@ -17,6 +17,8 @@ from typing import Any, Literal, Mapping
 from config.config import configPara
 from edge_uav.data import ComputeTask, UAV, EdgeUavScenario
 
+_LN2 = math.log(2.0)
+
 
 # =====================================================================
 # 类型别名 — 与 OffloadingModel 的嵌套 dict 接口一致
@@ -555,7 +557,7 @@ def _rate_from_gain(
 ) -> float:
     """Shannon 速率: r = B * log1p(P*g/N0) / ln(2)。低速率兜底 eps_rate。"""
     snr = tx_power * gain / noise_power
-    rate = bandwidth * math.log1p(snr) / math.log(2.0)
+    rate = bandwidth * math.log1p(snr) / _LN2
     if rate < eps_rate:
         return eps_rate
     return rate

@@ -26,6 +26,8 @@ class ComputeTask:
         f_local — 终端本地 CPU 频率上限，单位 Hz
     """
 
+    __hash__ = None
+
     def __init__(
         self,
         index: int,
@@ -83,6 +85,8 @@ class UAV:
         f_max     — 最大 CPU 频率，单位 Hz
         N_max     — 每时隙最大承载任务数（可选，None 表示无上限）
     """
+
+    __hash__ = None
 
     def __init__(
         self,

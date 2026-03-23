@@ -11,6 +11,7 @@ import numpy as np
 
 from config.config import configPara
 from edge_uav.data import ComputeTask, UAV, EdgeUavScenario
+from edge_uav.model.precompute import _channel_gain, _rate_from_gain
 
 
 class EdgeUavScenarioGenerator:
@@ -329,21 +330,30 @@ class EdgeUavScenarioGenerator:
         若连该下界都超过 tau，则卸载基本不可行。
         """
         best = math.inf
-        h_sq = float(config.H) ** 2
 
         for uav in uavs.values():
-            dx = float(task.pos[0]) - float(uav.pos[0])
-            dy = float(task.pos[1]) - float(uav.pos[1])
-            dist_sq = max(dx * dx + dy * dy + h_sq, 1e-12)
-            gain = float(config.rho_0) / dist_sq
-
-            r_up = float(config.B_up) * math.log2(
-                1.0 + float(config.P_i) * gain / float(config.N_0)
+            gain = _channel_gain(
+                task.pos,
+                uav.pos,
+                H=float(config.H),
+                rho_0=float(config.rho_0),
+                eps_dist_sq=1e-12,
             )
-            r_down = float(config.B_down) * math.log2(
-                1.0 + float(config.P_j) * gain / float(config.N_0)
+            r_up = _rate_from_gain(
+                gain,
+                bandwidth=float(config.B_up),
+                tx_power=float(config.P_i),
+                noise_power=float(config.N_0),
+                eps_rate=1e-12,
             )
-            if r_up <= 0.0 or r_down <= 0.0 or float(uav.f_max) <= 0.0:
+            r_down = _rate_from_gain(
+                gain,
+                bandwidth=float(config.B_down),
+                tx_power=float(config.P_j),
+                noise_power=float(config.N_0),
+                eps_rate=1e-12,
+            )
+            if float(uav.f_max) <= 0.0:
                 continue
 
             delay = (

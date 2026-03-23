@@ -18,6 +18,7 @@
 
 from llmAPI.llmInterface import InterfaceAPI
 from prompt.modPrompt import modPrompts
+from heuristics.hs_way_constants import WAY_MEMORY, WAY_PITCH, WAY_RANDOM
 import json
 import re
 import copy
@@ -61,12 +62,14 @@ class hsIndividual:
         # convert taxiInfo and passengerInfo from dictionary to string
         taxi_str = self.convert_taxi_dict_to_str(taxiInfo)
         passenger_str = self.convert_passenger_dict_to_str(passengerInfo)
-        if way == "way1":
+        if way == WAY_RANDOM:
             res = self.way1Run(loopIdx, passenger_str, taxi_str)
-        if way == "way2":
+        elif way == WAY_MEMORY:
             res = self.way2Run(loopIdx, passenger_str, taxi_str, p)
-        if way == "way3":
+        elif way == WAY_PITCH:
             res = self.way3Run(loopIdx, passenger_str, taxi_str, p)
+        else:
+            raise ValueError(f"Unsupported classic HS way: {way}")
 
         resToSave = {"taxi_info":taxi_str,
                      "passenger_info": passenger_str,
