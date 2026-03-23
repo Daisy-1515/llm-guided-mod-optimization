@@ -18,62 +18,102 @@
 
 ## 数学推导（关键）
 
-### 1. 频率优化的拉格朗日一阶条件
+### 前提假设
 
-对边缘节点 j、时隙 t、任务 i 的 CPU 频率 f_ji 求偏导：
+本节推导基于 BCD（Block Coordinate Descent）分解框架，固定以下变量：
+- **卸载决策 x** 已由 Level-1 BLP 求解（Block B）
+- **轨迹 q** 已由 Block D 给出或使用初始值
+- **单时隙假设 A5**：每个任务在单个时隙内完成，即 μ_i^t = F_i
 
-```
-∂L/∂f_ji = -α·F_i/(f²·τ_i) + 2·γ_w·γ_j·f·F_i/E_max + λ = 0
-```
+**符号约定：**
+- γ_w ≡ γ（论文公式 3-26 中的计算能耗权重系数）
+- γ_j：UAV j 的芯片有效开关电容系数（论文公式 3-24）
+- ν：容量约束 3-5 的拉格朗日乘子（注意：论文中 λ 已用于飞行能耗权重，此处用 ν 避免冲突）
 
-令：
-- a_i = α·F_i/τ_i
-- b_i = γ_w·γ_j·F_i/E_max
+### 1. L2a 子问题目标函数
 
-得：
-```
-2b_i·f³ + λ·f² - a_i = 0  ... (*)
-```
-
-### 2. 无约束 KKT 解（λ=0）
-
-当容量 Σf_i ≤ f_max 时，各任务独立最优频率为：
+完整目标函数（论文公式 3-26）在固定 x 和 q 后，对 f 优化可简化为：
 
 ```
-f_i* = (a_i / (2b_i))^(1/3) = (α·E_max / (2·γ_w·γ_j·τ_i))^(1/3)
-```
-
-### 3. 对偶二分法（λ>0，约束触发）
-
-当 Σf_i* > f_max_j 时，需找 λ 使 Σf_i(λ) = f_max_j
-
-**关键性质：** g(λ) := Σf_i(λ) 关于 λ 严格单调递减（λ增大→f_i减小）
-
-**算法：**
-```
-λ_min ← 0
-λ_max ← (max_i(a_i) - 2·b_i·eps²) / eps²  # 保守估计，使f_min ≥ eps_freq
-while (λ_max - λ_min) > 1e-12:
-    λ_mid ← (λ_min + λ_max) / 2
-    g_mid ← Σ_i f_i(λ_mid)
-    if g_mid > f_max:
-        λ_min ← λ_mid
-    else:
-        λ_max ← λ_mid
-return f_i(λ_mid)
-```
-
-**复杂度：** O(log(λ_max/1e-12)) × O(n_tasks × 60) ≈ O(n_tasks × 600)，可承受
-
-### 4. 目标函数（频率相关项）
-
-```
-L2a_obj = Σ_{j,i,t ∈ offload} [
-    α·F_i/(f_ji·τ_i) + γ_w·γ_j·(f_ji)²·F_i/E_max
+L2a_obj = Σ_{j,i,t ∈ O_{j,t}} [
+    α·F_i/(f_{j,i}^t·τ_i) + γ_w·γ_j·(f_{j,i}^t)²·F_i/E_j^max
 ]
 ```
 
-注：计算真实成本时，需加上通信时延项（由 precompute 提供，不在此优化）
+其中 O_{j,t} = {i : ζ_i^t·x_{i,j}^t = 1} 为时隙 t 卸载到 UAV j 的活跃任务集合。
+
+> **说明**：论文 3-26 的延迟项 D_{i,j}^t/τ_i = [D_l/r + F/f + D_r/r_down]/τ_i 中，
+> 通信时延项 D_l/r_{i,j}^t 和 D_r/r_{j,i}^{down,t} 在 BCD 固定 q 后为常数（通信速率
+> 仅依赖 UAV 位置），对 f 求偏导为零，故在频率子问题中可省略（不影响最优解）。
+> 飞行能耗项 λ·E_fly/E_max 同理为常数。
+
+### 2. 频率优化的拉格朗日一阶条件
+
+约束为逐时隙容量约束（论文公式 3-5，固定 x 后）：Σ_{i∈O_{j,t}} f_{j,i}^t ≤ f_j^max。
+
+构造拉格朗日函数并对 f_{j,i}^t 求偏导：
+
+```
+∂L/∂f_{j,i}^t = -α·F_i/(f²·τ_i) + 2·γ_w·γ_j·f·F_i/E_j^max + ν = 0
+```
+
+令：
+- a_i = α·F_i/τ_i（延迟系数，仅依赖任务 i）
+- b_{j,i} = γ_w·γ_j·F_i/E_j^max（能耗系数，依赖 UAV j 和任务 i）
+
+得：
+```
+2b_{j,i}·f³ + ν·f² - a_i = 0  ... (*)
+```
+
+### 3. 无约束 KKT 解（ν=0）
+
+当容量 Σf_i ≤ f_j^max 时（互补松弛 ν=0），各任务独立最优频率为：
+
+```
+f_i* = (a_i / (2b_{j,i}))^(1/3) = (α·E_j^max / (2·γ_w·γ_j·τ_i))^(1/3)
+```
+
+### 4. 对偶二分法（ν>0，约束触发）
+
+当 Σf_i* > f_j^max 时，需找 ν 使 Σf_i(ν) = f_j^max
+
+**关键性质：** g(ν) := Σf_i(ν) 关于 ν 严格单调递减（ν增大→f_i减小）
+
+**算法：**
+```
+ν_min ← 0
+ν_max ← (max_i(a_i) - 2·b_{j,i}·eps²) / eps²  # 保守估计，使f_min ≥ eps_freq
+while (ν_max - ν_min) > 1e-12:
+    ν_mid ← (ν_min + ν_max) / 2
+    g_mid ← Σ_i f_i(ν_mid)
+    if g_mid > f_j^max:
+        ν_min ← ν_mid
+    else:
+        ν_max ← ν_mid
+return f_i(ν_mid)
+```
+
+**复杂度：** O(log(ν_max/1e-12)) × O(n_tasks × 60) ≈ O(n_tasks × 600)，可承受
+
+### 5. 能量预算约束（公式 3-25）处理策略
+
+论文公式 3-25 要求：Σ_t E_fly^{j,t} + Σ_{i,t} ζ·x·γ_j·(f_{j,i}^t)²·F_i ≤ E_j^max
+
+**当前实现（v1）的简化：**
+- 仅处理逐时隙容量约束（公式 3-5）
+- 能量预算约束留待 BCD wrapper 层检查
+- 目标函数中的能耗惩罚项 γ_w·γ_j·f²·F/E_j^max 提供软约束效果
+
+**理由：**
+- 在 BCD 固定 q 后，飞行能耗为常数 E_fly_fixed = Σ_t E_fly^{j,t}
+- 3-25 变为剩余预算约束：Σ_{i,t} γ_j·f²·F ≤ E_j^max - E_fly_fixed
+- 这是跨时隙的全局二次约束，若完整对偶化需引入额外乘子 η_j
+- v1 先验证 BCD 框架可行性，若 3-25 频繁被违反再升级为双乘子 KKT
+
+**代码层面支持：**
+- solve_resource_allocation 返回 total_comp_energy_per_uav，供 BCD wrapper 做可行性检查
+- BCD wrapper 比对 E_j^max - E_fly_total，若违反则发出警告或触发频率缩放
 
 ---
 
@@ -103,7 +143,7 @@ class ResourceAllocResult:
 
     属性：
         f_local: dict[i][t] = task.f_local（本地频率恒为最大）
-        f_edge: dict[j][i][t] = KKT最优频率
+        f_edge: dict[j][t][i] = KKT最优频率
         objective_value: 频率相关的目标值（仅 L2a-obj 部分）
         diagnostics: 诊断信息
             - binding_slots: 容量约束触发的 (j,t) 数量
@@ -113,6 +153,7 @@ class ResourceAllocResult:
     f_local: Scalar2D
     f_edge: Scalar3D
     objective_value: float
+    total_comp_energy: dict  # {j: float} 每 UAV 的总计算能耗，供 BCD wrapper 检查 3-25
     diagnostics: dict
 
 # 第三部分：公开 API
@@ -126,10 +167,11 @@ def solve_resource_allocation(
 ) -> ResourceAllocResult:
     """Block C：给定卸载决策，求最优频率分配。
 
-    数学模型：
-        min_f Σ_{j,i,t} [α·F_i/(f·τ) + γ_w·γ_j·f²·F_i/E_max]
-        s.t.  Σ_i f_ji^t ≤ f_max_j  ∀j,t
-              f_ji^t ≥ eps_freq
+    数学模型（L2a 子问题，BCD 固定 x,q 后）：
+        min_f Σ_{j,i,t∈O_{j,t}} [α·F_i/(f·τ) + γ_w·γ_j·f²·F_i/E_j^max]
+        s.t.  Σ_{i∈O_{j,t}} f_{j,i}^t ≤ f_j^max  ∀j,t  (公式 3-5)
+              f_{j,i}^t ≥ eps_freq
+    注：γ_w ≡ γ（论文 3-26 能耗权重），ν 为容量约束的拉格朗日乘子
 
     求解方法：
         1. f_local = task.f_local（无约束最优）
@@ -177,15 +219,15 @@ def solve_resource_allocation(
             if not task_ids:
                 continue
 
-            # 构造该时隙的任务谱：[(i, a_i, b_i), ...]
+            # 构造该时隙的任务谱：[(i, a_i, b_{j,i}), ...]
             task_specs = []
             for i in task_ids:
                 task = scenario.tasks[i]
                 F_i = task.F
                 tau_i = task.tau
                 a_i = alpha * F_i / tau_i
-                b_i = gamma_w * params.gamma_j * F_i / scenario.uavs[j].E_max
-                task_specs.append((i, a_i, b_i))
+                b_ji = gamma_w * params.gamma_j * F_i / scenario.uavs[j].E_max
+                task_specs.append((i, a_i, b_ji))
 
             # 求解该时隙的最优频率
             slot_freqs, n_bisect = _solve_slot_kkt(
@@ -250,7 +292,7 @@ def _parse_offloading_decisions(outputs: dict, scenario: EdgeUavScenario) -> tup
 
 
 def _solve_slot_kkt(
-    task_specs: list,  # [(i, a_i, b_i), ...]
+    task_specs: list,  # [(i, a_i, b_{j,i}), ...]
     f_max: float,
     eps_freq: float,
 ) -> tuple[dict, int]:
@@ -258,7 +300,7 @@ def _solve_slot_kkt(
 
     返回：
         (freqs_dict, n_bisect_iters)
-        freqs_dict: {i: f_ji*}
+        freqs_dict: {i: f_{j,i}^t*}
         n_bisect_iters: 对偶二分迭代数（0表示无约束解直接可行）
     """
     if not task_specs:
@@ -283,7 +325,7 @@ def _solve_slot_kkt(
         }
         return feasible_freqs, 0
 
-    # 第三阶段：对偶二分法求 λ
+    # 第三阶段：对偶二分法求 ν（容量约束乘子）
     lam_min = 0.0
     lam_max = (max(a_i for _, a_i, _ in task_specs) - 2e-12) / (eps_freq ** 2)
 
@@ -293,7 +335,7 @@ def _solve_slot_kkt(
     while n_bisect < max_bisect_iters:
         lam_mid = (lam_min + lam_max) / 2
 
-        # 计 g(λ_mid) = Σ f_i(λ_mid)
+        # 计 g(ν_mid) = Σ f_i(ν_mid)
         g_mid = 0.0
         for i, a_i, b_i in task_specs:
             f_i = _freq_at_dual(a_i, b_i, lam_mid, f_max, eps_freq)
@@ -309,7 +351,7 @@ def _solve_slot_kkt(
         if (lam_max - lam_min) < 1e-12:
             break
 
-    # 用最终的 λ 计频率
+    # 用最终的 ν 计频率
     lam_final = (lam_min + lam_max) / 2
     constrained_freqs = {
         i: _freq_at_dual(a_i, b_i, lam_final, f_max, eps_freq)
@@ -326,12 +368,12 @@ def _freq_at_dual(
     f_max: float,
     eps_freq: float,
 ) -> float:
-    """对给定 λ，求解 2b·f³ + λ·f² - a = 0 的正根。
+    """对给定 ν（容量约束乘子），求解 2b·f³ + ν·f² - a = 0 的正根。
 
     使用二分法在 [eps_freq, f_max] 上搜索。
 
-    方程：2b·f³ + λ·f² - a = 0
-    导数：6b·f² + 2λ·f > 0  （f > 0 时严格递增）
+    方程：2b_{j,i}·f³ + ν·f² - a_i = 0（KKT 一阶条件 (*)）
+    导数：6b_{j,i}·f² + 2ν·f > 0  （f > 0 时严格递增）
     """
     def h(f):
         return 2 * b_i * f**3 + lam * f**2 - a_i
@@ -371,7 +413,7 @@ def _compute_objective(
 ) -> float:
     """计算频率相关的目标值（L2a-obj）。
 
-    L2a_obj = Σ_{j,i,t} [α·F_i/(f·τ) + γ_w·γ_j·f²·F_i/E_max]
+    L2a_obj = Σ_{j,i,t∈O_{j,t}} [α·F_i/(f·τ) + γ_w·γ_j·f²·F_i/E_j^max]
     """
     obj = 0.0
 
@@ -651,16 +693,16 @@ class TestKKTVerification:
         f0 = f_edge[0][0][0]
         f1 = f_edge[0][0][1]
 
-        # KKT 条件：∂L/∂f_i = 0 (或 λ·f_i = 0 若边界)
+        # KKT 条件：∂L/∂f_i = 0 (或 ν·(Σf-fmax) = 0 互补松弛)
         a0 = alpha * task0.F / task0.tau
         a1 = alpha * task1.F / task1.tau
-        b = gamma_w * params.gamma_j / uav.E_max
+        b = gamma_w * params.gamma_j / uav.E_max  # b_{j,i} 中 F_i 在一阶条件中消去
 
-        # 一阶条件（近似）：-a/f² + 2b·f = const（λ）
-        lambda_est = -a0 / f0**2 + 2 * b * f0
+        # 一阶条件（近似）：-a/f² + 2b·f = const（ν）
+        nu_est = -a0 / f0**2 + 2 * b * f0
 
-        residual0 = abs(-a0 / f0**2 + 2 * b * f0 - lambda_est)
-        residual1 = abs(-a1 / f1**2 + 2 * b * f1 - lambda_est)
+        residual0 = abs(-a0 / f0**2 + 2 * b * f0 - nu_est)
+        residual1 = abs(-a1 / f1**2 + 2 * b * f1 - nu_est)
 
         assert residual0 < 1e-8
         assert residual1 < 1e-8
@@ -680,11 +722,12 @@ class TestKKTVerification:
 - [ ] 类型别名从 precompute.py 导入（不重复定义）
 
 ### 数学正确性
-- [ ] KKT 一阶条件：2b·f³ + λ·f² - a = 0 ✓
-- [ ] 无约束解：f* = (a/(2b))^(1/3) ✓
-- [ ] λ 的二分范围设定合理 ✓
+- [ ] KKT 一阶条件：2b_{j,i}·f³ + ν·f² - a_i = 0 ✓
+- [ ] 无约束解：f* = (a_i/(2b_{j,i}))^(1/3) ✓
+- [ ] ν 的二分范围设定合理 ✓
 - [ ] f 的二分求解（方程逆解）正确 ✓
 - [ ] 目标函数计算完整 ✓
+- [ ] 能量预算 3-25 在 BCD wrapper 层检查 ✓
 
 ### 测试覆盖
 - [ ] T1: 本地唯一 → f_edge 空
@@ -722,7 +765,7 @@ pytest tests/ -v --tb=short
 **预计耗时：** 2-3 小时（包括调试）
 
 **关键风险：**
-- 二分法收敛性：需验证 λ_max 估计的保守性
+- 二分法收敛性：需验证 ν_max 估计的保守性
 - KKT 残差精度：target < 1e-8，可能需要 eps_freq 调整
 - 异构 τ 场景设计：T7 验证对偶解的优越性
 
