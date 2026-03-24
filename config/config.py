@@ -82,6 +82,13 @@ class configPara:
         self.eta_3 = 0.0151     # 机身阻力比
         self.eta_4 = 0.0048     # 空气密度系数
 
+        # ---- Phase⑥ BCD 循环参数（Level-2b 轨迹优化）----
+        self.v_traj_max = 15.0          # 轨迹优化最大速度 (m/s)
+        self.d_safe_traj = 5.0          # 轨迹优化安全距离 (m)
+        self.max_sca_iter = 5           # SCA 最大迭代数
+        self.eps_sca = 1e-3             # SCA 收敛容差
+        self.safe_slack_penalty = 1e3   # 安全距离松弛罚项权重
+
         # 场景规模
         self.numTasks = 10      # 终端设备数
         self.numUAVs = 3        # UAV 数
@@ -268,6 +275,13 @@ def dynamic_obj_func(self):
 
         # 场景随机种子
         self.scenario_seed = self.get_config_value('edgeUavSeed', 'scenario_seed', self.scenario_seed, cast=int)
+
+        # ---- Phase⑥ BCD 循环参数 ----
+        self.v_traj_max = self.get_config_value('edgeUavBCD', 'v_traj_max', self.v_traj_max, cast=float)
+        self.d_safe_traj = self.get_config_value('edgeUavBCD', 'd_safe_traj', self.d_safe_traj, cast=float)
+        self.max_sca_iter = self.get_config_value('edgeUavBCD', 'max_sca_iter', self.max_sca_iter, cast=int)
+        self.eps_sca = self.get_config_value('edgeUavBCD', 'eps_sca', self.eps_sca, cast=float)
+        self.safe_slack_penalty = self.get_config_value('edgeUavBCD', 'safe_slack_penalty', self.safe_slack_penalty, cast=float)
 
         # then load environment variables
         self.getEnvInfo()
