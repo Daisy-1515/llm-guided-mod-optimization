@@ -67,18 +67,23 @@ def flight_energy_per_slot(
     eta_3: float,
     eta_4: float,
     v_tip: float,
+    include_terminal_hover: bool = False,
 ) -> dict[int, float]:
     """Per-slot flight energy for a single UAV trajectory.
 
     Eq.(3'): v² = ‖q[t+1] - q[t]‖² / δ²
     Eq.(17): E_fly[t] = P_prop(v²) * δ
 
-    The last time slot uses hover power (v=0) since no q[t+1] exists.
+    The last time slot is excluded by default because the planning horizon
+    ends at q[T-1]. Set include_terminal_hover=True to charge hover power
+    at the terminal slot instead.
 
     Args:
         q_j: Trajectory {t: (x, y)} for UAV j, sorted by time slot.
         delta: Time slot duration in seconds.
         eta_1..eta_4, v_tip: Propulsion parameters.
+        include_terminal_hover: Whether to charge hover energy at the final
+            slot when no q[t+1] exists.
 
     Returns:
         {t: E_fly} flight energy per slot in Joules.
@@ -95,7 +100,9 @@ def flight_energy_per_slot(
             x1, y1 = q_j[slots[idx + 1]]
             v_sq = ((x1 - x0) ** 2 + (y1 - y0) ** 2) / delta_sq
         else:
-            v_sq = 0.0  # last slot: hover
+            if not include_terminal_hover:
+                continue
+            v_sq = 0.0  # last slot: optional hover
 
         energies[t] = propulsion_power(v_sq, **prop_kw) * delta
 
@@ -111,6 +118,7 @@ def total_flight_energy(
     eta_3: float,
     eta_4: float,
     v_tip: float,
+    include_terminal_hover: bool = False,
 ) -> dict[int, float]:
     """Total flight energy for each UAV across all time slots.
 
@@ -118,6 +126,8 @@ def total_flight_energy(
         q: Fleet trajectory {j: {t: (x, y)}}.
         delta: Time slot duration in seconds.
         eta_1..eta_4, v_tip: Propulsion parameters.
+        include_terminal_hover: Whether to charge hover energy at the final
+            slot of each UAV trajectory.
 
     Returns:
         {j: total_E_fly} total flight energy per UAV in Joules.
@@ -125,6 +135,6 @@ def total_flight_energy(
     prop_kw = dict(eta_1=eta_1, eta_2=eta_2, eta_3=eta_3,
                    eta_4=eta_4, v_tip=v_tip)
     return {
-        j: sum(flight_energy_per_slot(q[j], delta, **prop_kw).values())
+        j: sum(flight_energy_per_slot(q[j], delta, include_terminal_hover=include_terminal_hover, **prop_kw).values())
         for j in sorted(q)
     }

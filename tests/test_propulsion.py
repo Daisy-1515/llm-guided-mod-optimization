@@ -66,30 +66,34 @@ class TestFlightEnergy:
     """Tests for flight_energy_per_slot and total_flight_energy."""
 
     def test_stationary_uav(self):
-        """UAV stays at same position → all slots get hover energy."""
+        """UAV stays at same position → all slots except last get hover energy."""
         q_j = {0: (100.0, 200.0), 1: (100.0, 200.0), 2: (100.0, 200.0)}
         delta = 1.0
         energies = flight_energy_per_slot(q_j, delta, **PROP)
 
         hover_power = propulsion_power(0.0, **PROP)
+        # By default, exclude terminal slot (include_terminal_hover=False)
+        # So slots 0 and 1 have hover energy, slot 2 is excluded
+        assert len(energies) == 2  # only t=0 and t=1
         for t, e in energies.items():
             assert e == pytest.approx(hover_power * delta, rel=1e-10)
 
     def test_flight_energy_moving(self):
-        """UAV moves 10m/slot → v=10m/s, energy = P(100)*δ per slot."""
+        """UAV moves 10m/slot → v=10m/s, energy = P(100)*δ per slot (excluding terminal)."""
         q_j = {0: (0.0, 0.0), 1: (10.0, 0.0), 2: (20.0, 0.0)}
         delta = 1.0
         energies = flight_energy_per_slot(q_j, delta, **PROP)
 
         p_moving = propulsion_power(100.0, **PROP)  # v_sq = 10^2
-        hover_p = propulsion_power(0.0, **PROP)
 
+        # By default, exclude terminal slot
+        # So only slots 0 and 1 are included (transitions t=0→1 and t=1→2)
+        assert len(energies) == 2
         assert energies[0] == pytest.approx(p_moving * delta, rel=1e-10)
         assert energies[1] == pytest.approx(p_moving * delta, rel=1e-10)
-        assert energies[2] == pytest.approx(hover_p * delta, rel=1e-10)  # last slot
 
     def test_total_flight_energy(self):
-        """Multi-UAV: each UAV has independent total energy."""
+        """Multi-UAV: each UAV has independent total energy (excluding terminal slot)."""
         q = {
             0: {0: (0.0, 0.0), 1: (10.0, 0.0), 2: (20.0, 0.0)},
             1: {0: (50.0, 50.0), 1: (50.0, 50.0), 2: (50.0, 50.0)},
@@ -97,13 +101,13 @@ class TestFlightEnergy:
         delta = 1.0
         totals = total_flight_energy(q, delta, **PROP)
 
-        # UAV 0: 2 moving slots + 1 hover slot
+        # UAV 0: 2 moving slots (excluding terminal)
         e0_slots = flight_energy_per_slot(q[0], delta, **PROP)
         assert totals[0] == pytest.approx(sum(e0_slots.values()), rel=1e-10)
 
-        # UAV 1: all stationary
+        # UAV 1: 2 stationary slots (excluding terminal)
         hover_power = propulsion_power(0.0, **PROP)
-        assert totals[1] == pytest.approx(3 * hover_power * delta, rel=1e-10)
+        assert totals[1] == pytest.approx(2 * hover_power * delta, rel=1e-10)
 
         # UAV 0 (moving at 10m/s) uses less energy than UAV 1 (hovering)
         # because the U-shaped power curve means hover is more expensive

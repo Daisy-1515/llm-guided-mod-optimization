@@ -86,9 +86,11 @@ class TestLocalOnly:
             alpha=1.0, gamma_w=1e-9,
         )
 
-        # f_edge: no slot entries for any UAV
+        # f_edge: no time slot entries for any task (all empty dicts)
         for j in scenario.uavs:
-            assert len(result.f_edge.get(j, {})) == 0
+            assert len(result.f_edge.get(j, {})) == len(scenario.tasks)
+            for i in scenario.tasks:
+                assert len(result.f_edge[j][i]) == 0
 
         # f_local: equals task.f_local
         for i, task in scenario.tasks.items():
@@ -147,7 +149,8 @@ class TestCapacityBinding:
             scenario, offloading, params, alpha=1.0, gamma_w=1e-9,
         )
 
-        total_f = sum(result.f_edge[0][0].values())
+        # All 3 tasks at time slot 0 should sum to f_max (capacity binding)
+        total_f = sum(result.f_edge[0][i][0] for i in [0, 1, 2])
         assert total_f == pytest.approx(scenario.uavs[0].f_max, rel=1e-5)
         assert result.diagnostics["binding_slots"] >= 1
 
@@ -230,8 +233,8 @@ class TestHeterogeneousTau:
             scenario, offloading, params, alpha=alpha, gamma_w=gamma_w,
         )
 
-        f0_dual = result.f_edge[0][0][0]
-        f1_dual = result.f_edge[0][0][1]
+        f0_dual = result.f_edge[0][0][0]  # task 0, time slot 0
+        f1_dual = result.f_edge[0][1][0]  # task 1, time slot 0
 
         # Naive proportional scaling baseline
         c0 = (alpha * uav.E_max / (2.0 * gamma_w * params.gamma_j * 0.1)) ** (1.0 / 3.0)
@@ -266,8 +269,8 @@ class TestKKTVerification:
             scenario, offloading, params, alpha=alpha, gamma_w=gamma_w,
         )
 
-        f0 = result.f_edge[0][0][0]
-        f1 = result.f_edge[0][0][1]
+        f0 = result.f_edge[0][0][0]  # task 0, time slot 0
+        f1 = result.f_edge[0][1][0]  # task 1, time slot 0
         task0, task1 = scenario.tasks[0], scenario.tasks[1]
 
         # KKT: ∂L/∂f = -a/f² + 2b·f + λ = 0  ⟹  λ = a/f² - 2b·f

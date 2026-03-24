@@ -35,7 +35,7 @@ class ResourceAllocResult:
 
     Attributes:
         f_local: dict[i][t] — local CPU frequency (Hz), always task.f_local.
-        f_edge:  dict[j][t][i] — edge CPU frequency (Hz), KKT-optimal.
+        f_edge:  dict[j][i][t] — edge CPU frequency (Hz), KKT-optimal.
         objective_value: L2a-obj (delay + energy terms for offloaded tasks).
         total_comp_energy: {j: float} — per-UAV total computation energy (J),
             for BCD wrapper to check energy budget constraint (Eq. 3-25).
@@ -92,8 +92,8 @@ def solve_resource_allocation(
         for i, task in scenario.tasks.items()
     }
 
-    # f_edge: solve per (j, t) slot via KKT + dual bisection
-    f_edge: Scalar3D = {j: {} for j in scenario.uavs}
+    # f_edge: store as [j][i][t]; solve per (j, t) slot via KKT + dual bisection
+    f_edge: Scalar3D = {j: {i: {} for i in scenario.tasks} for j in scenario.uavs}
     diag = {"binding_slots": 0, "total_bisect_iters": 0, "max_bisect_iters": 0}
 
     for j, slot_map in offload_sets.items():
@@ -110,7 +110,8 @@ def solve_resource_allocation(
                 specs.append((i, a_i, b_i))
 
             freqs, n_bisect = _solve_slot_kkt(specs, uav.f_max, params.eps_freq)
-            f_edge[j][t] = freqs
+            for i, f in freqs.items():
+                f_edge[j][i][t] = f
 
             if n_bisect > 0:
                 diag["binding_slots"] += 1
@@ -267,10 +268,10 @@ def _compute_objective(
     obj = 0.0
     for j, slot_map in offload_sets.items():
         uav = scenario.uavs[j]
+        task_freqs = f_edge.get(j, {})
         for t, task_ids in slot_map.items():
-            slot_freqs = f_edge.get(j, {}).get(t, {})
             for i in task_ids:
-                f = slot_freqs.get(i)
+                f = task_freqs.get(i, {}).get(t)
                 if f is None or f <= 0.0:
                     continue
                 task = scenario.tasks[i]
@@ -292,10 +293,10 @@ def _compute_comp_energy(
     """
     energy: dict[int, float] = {j: 0.0 for j in scenario.uavs}
     for j, slot_map in offload_sets.items():
+        task_freqs = f_edge.get(j, {})
         for t, task_ids in slot_map.items():
-            slot_freqs = f_edge.get(j, {}).get(t, {})
             for i in task_ids:
-                f = slot_freqs.get(i)
+                f = task_freqs.get(i, {}).get(t)
                 if f is None or f <= 0.0:
                     continue
                 task = scenario.tasks[i]
