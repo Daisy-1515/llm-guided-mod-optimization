@@ -9,7 +9,6 @@
 @brief This module handles the sorting of individuals in each population.
 """
 
-from sentence_transformers import SentenceTransformer
 import numpy as np
 import json
 from collections import defaultdict
@@ -34,6 +33,12 @@ class hsSorting:
     
 class hsDiversitySorting:
     def __init__(self, similarity_threshold=0.8):
+        try:
+            from sentence_transformers import SentenceTransformer
+        except Exception as exc:
+            raise RuntimeError(
+                "hsDiversitySorting requires sentence-transformers and a working torch runtime."
+            ) from exc
         self.model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         self.similarity_threshold = similarity_threshold
         

@@ -8,9 +8,6 @@
 @package llmInterface.py
 @brief This module handles the api call with LLM.
 """
-from transformers import AutoTokenizer
-
-
 from llmAPI.llmInterface_huggingface import InterfaceAPI_huggingface
 
 class InterfaceAPI:
