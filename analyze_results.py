@@ -4,6 +4,8 @@
     .venv/Scripts/python analyze_results.py
     .venv/Scripts/python analyze_results.py --run-dir discussion/20260320_143012
     .venv/Scripts/python analyze_results.py --expected-pop-size 3 --expected-iterations 3
+
+如果不指定 --expected-iterations，脚本会尝试从 config/setting.cfg 读取。
 """
 
 import argparse
@@ -11,12 +13,26 @@ import json
 import re
 import sys
 from pathlib import Path
+from configparser import ConfigParser
 
 
 GEN_FILE_RE = re.compile(r"population_result_(\d+)\.json$")
 
 
 # ─── 辅助函数 ────────────────────────────────────────────────────────────────
+
+def _read_config_iteration():
+    """从 config/setting.cfg 读取 iteration 值，失败则返回 None。"""
+    config_path = Path("config/setting.cfg")
+    if not config_path.exists():
+        return None
+    try:
+        parser = ConfigParser()
+        parser.read(config_path)
+        return parser.getint("hsSettings", "iteration")
+    except Exception:
+        return None
+
 
 def _resolve_run_dir(run_dir_arg):
     """定位结果目录：显式指定 > 自动取最新 discussion/YYYYMMDD_*/。"""
@@ -103,9 +119,17 @@ def _summarize_generation(data):
 def main():
     parser = argparse.ArgumentParser(description="Phase⑤ 首跑结果分析")
     parser.add_argument("--run-dir", help="结果目录（默认取最新）")
-    parser.add_argument("--expected-pop-size", type=int, default=3)
-    parser.add_argument("--expected-iterations", type=int, default=3)
+    parser.add_argument("--expected-pop-size", type=int, default=None)
+    parser.add_argument("--expected-iterations", type=int, default=None)
     args = parser.parse_args()
+
+    # 如果未指定 expected_iterations，尝试从 config 读取
+    if args.expected_iterations is None:
+        config_iter = _read_config_iteration()
+        if config_iter is not None:
+            args.expected_iterations = config_iter
+        else:
+            args.expected_iterations = 3  # 默认备选值
 
     try:
         run_dir = _resolve_run_dir(args.run_dir)
@@ -114,7 +138,7 @@ def main():
         return 1
 
     gen_files = _collect_generation_files(run_dir)
-    print(f"run_dir={run_dir}  json_files={len(gen_files)}")
+    print(f"run_dir={run_dir}  json_files={len(gen_files)} expected_iterations={args.expected_iterations}")
     print("=" * 72)
 
     # ---- 每代摘要 ----
