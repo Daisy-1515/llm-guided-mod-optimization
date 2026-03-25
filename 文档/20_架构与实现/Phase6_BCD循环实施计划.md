@@ -7,7 +7,7 @@
 
 Phase⑤ 已完成（S1-S4 全 PASS），当前系统仅运行 Level-1 单层优化（固定轨迹+频率，只求解卸载决策）。需要实现 Level-2（资源分配+轨迹规划）并通过 BCD 交替迭代与 Level-1 耦合，实现联合优化。
 
-数学规范已完整定义于 `文档/公式20_两层解耦.md`。
+数学规范已完整定义于 `文档/10_模型与公式/公式20_两层解耦.md`。
 
 ---
 
@@ -215,5 +215,5 @@ self.cost_rollback_delta = 0.05  # 代价回滚阈值
 | 评估器 | `edge_uav/model/evaluator.py` |
 | HS 个体 | `heuristics/hsIndividualEdgeUav.py` |
 | 配置 | `config/config.py` + `config/setting.cfg` |
-| 数学规范 | `文档/公式20_两层解耦.md` |
-| 架构分析 | `文档/解耦对比分析报告.md` |
+| 数学规范 | `文档/10_模型与公式/公式20_两层解耦.md` |
+| 架构分析 | `文档/40_审查与诊断/解耦对比分析报告.md` |

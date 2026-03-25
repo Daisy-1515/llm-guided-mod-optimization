@@ -190,7 +190,7 @@ def evaluate_solution(outputs, precompute_result, scenario) -> float:
 
 ### Phase ⑤-前置：完整 Pipeline 首次试跑（P0，先于 BCD 循环）
 
-> 详细计划见：`文档/首次试跑计划_Phase5_pipeline.md`
+> 详细计划见：`文档/30_测试与执行/首次试跑计划_Phase5_pipeline.md`
 > 状态：**已批准，待执行（2026-03-19）**
 
 执行顺序：A（提交加固）→ B（可观测性）→ C/D（预飞）→ E（1×1 → 3×3 试跑）→ F（分析）

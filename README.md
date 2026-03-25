@@ -1,95 +1,226 @@
-<div align=center>
-<h1 align="center">
-Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems
-</h1>
-<h3 align="center">
-LLM + Mathematical Optimization
-</h3>
+<div align="center">
+<h1>Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems</h1>
+<p><strong>LLM + Mathematical Optimization</strong></p>
 </div>
 
-### [Paper Link](https://arxiv.org/pdf/2510.10644) 
-<!---
-| [Project Page](https://github.com/yizhangele/llm-guided-mod-optimization) 
--->
-<!---
-![Unbalanced World](./image/unbalancedWorld.png)
--->
-<!---
-## Introduction
--->
-## Method Overview
-<p align="center">
-    <img src="./image/unbalancedWorld.png" alt="Alt Text" style="width:80%; height:auto;">
-</p>
+[Paper Link](https://arxiv.org/pdf/2510.10644)
 
-<p align="justify">
-Mobility-on-demand platforms, such as ride-hailing services, have become critical urban transportation infrastructures. They address unbalanced demand and supply by continuously executing decision-making processes.
-</p>
+## What This Repo Is
 
-<p align="center">
-    <img src="./image/workFlow.png" alt="Alt Text" style="width:80%; height:auto;">
-</p>
+This repository studies how to combine large language models with mathematical optimization for mobility-on-demand systems.
 
-<p align="justify">
-Our proposed method <strong>integrates large language model (LLM) with mathematical optimization</strong> in a dynamic hierarchical system to optimize mobility operations. The hybrid LLM-optimizer framework decomposes the problem hierarchically, strategically embedding LLM only where human expertise bottlenecks exist:
-</p>
+It currently contains two parallel tracks:
 
-- <strong>LLM as Meta-Objective Designer</strong>: Dynamically evolves strategic objectives via prompt-based harmony search, guided by feasibility feedback from the optimization solver.
-- <strong>Optimizer as Constraint Enforcer</strong>: Solves operational routing layer with mathematical rigor, ensuring real-time feasibility.
-- <strong>Heuristics as Prompt Evolver</strong>: Leverages harmony search algorithm to iteratively refine LLM prompts, guided by optimizer feedback to adaptively explore and
-converge toward effective meta-objectives
+- The original MoD pipeline for hierarchical optimization.
+- The Edge-UAV adaptation, where task offloading, resource allocation, and UAV trajectory planning are optimized jointly.
 
+If you only need the shortest possible mental model:
 
-<p align="justify">
-This hybrid approach <strong>combines the semantic richness of LLM with the structural robustness of traditional optimization</strong>, delivering solutions that outperform state-of-the-art baselines.
-</p>
+1. The LLM proposes or evolves high-level objective logic.
+2. Harmony Search mutates and selects prompts/objectives.
+3. The optimizer enforces hard constraints and produces feasible operational decisions.
 
-## Installation
+## Progressive Disclosure
 
-### 1. Clone the Repo
+This README is organized from shallow to deep. Stop at the first level that answers your question.
+
+### Level 0: 5-Minute Overview
+
+Read this section if you only want to know whether this repository is relevant.
+
+- Problem: dynamic mobility optimization under demand-supply imbalance.
+- Core idea: use an LLM where objective design is hard, but keep feasibility under a mathematical optimizer.
+- Main method: a three-layer architecture combining prompt evolution, optimization, and simulation feedback.
+- Paper: [arXiv PDF](https://arxiv.org/pdf/2510.10644)
+
+### Level 1: 10-Minute Getting Started
+
+Read this section if you want to install dependencies and run something.
+
+#### Prerequisites
+
+- Python 3.10
+- Gurobi and a valid `gurobipy` license
+- An LLM API endpoint if you want to run the LLM-guided pipeline
+
+#### Environment Setup
+
+Recommended:
+
 ```bash
-git clone https://github.com/yizhangele/llm-guided-mod-optimization.git
-cd llm-guided-mod-optimization
+uv sync
 ```
 
-### 2. Create a Conda Virtual Environment with Required Dependencies
+Or use the original conda setup:
+
 ```bash
 conda env create -f dependencies.yml
 conda activate llm-guided-mod-optimization
 ```
-You can also manually install the dependencies.
 
-**Note:** This code depends on Gurobi (`gurobipy`), which requires a license.
-- Academic users can request **free academic licenses** from Gurobi: [Gurobi Academic License](https://www.gurobi.com/academia/academic-program-and-licenses/)
-- Commercial users need paid licenses.
+#### Configure LLM Access
 
-### 3. Update Configuration Files
-1. Update `config/env/.env` with the API access token for your chosen LLM hosting provider.
-2. Depending on your chosen LLM model and hosting provider, you may need to implement your own code to formulate API requests and parse heuristics from API responses.
-3. Update all other configurations in `config/setting.cfg`.
+Edit `config/env/.env`:
 
-## Usage
+```env
+HUGGINGFACE_ENDPOINT="https://your-endpoint/v1"
+HUGGINGFACEHUB_API_TOKEN="sk-your-api-key"
+```
 
-### Running A Test
+Edit `config/setting.cfg`:
+
+```ini
+[llmSettings]
+platform = HuggingFace
+model = glm-5
+```
+
+Notes:
+
+- The current factory path is `HuggingFace`, but it is used as an OpenAI-compatible chat-completions route.
+- If you switch providers or response formats, you may need to adjust request/response handling in `llmAPI/`.
+
+#### Common Commands
+
 ```bash
 python testAll.py
+python testEdgeUav.py
+python -m pytest tests -v
+python check_llm_api.py
 ```
+
+- `python testAll.py`: original MoD pipeline.
+- `python testEdgeUav.py`: Edge-UAV pipeline.
+- `python -m pytest tests -v`: unit and integration tests.
+- `python check_llm_api.py`: quick validation of LLM connectivity.
+
+### Level 2: Architecture and Code Navigation
+
+Read this section if you want to modify code, debug behavior, or add new modules.
+
+#### Three-Layer Architecture
+
+1. `LLM as Meta-Objective Designer`
+2. `Harmony Search as Prompt Evolver`
+3. `Optimizer as Constraint Enforcer`
+
+#### Main Entry Points
+
+- `testAll.py`: original project entry.
+- `testEdgeUav.py`: Edge-UAV entry.
+- `check_llm_api.py`: API connectivity check.
+- `analyze_results.py`: result inspection and summary.
+
+#### High-Level Directory Map
+
+- `llmAPI/`: LLM interface and provider-specific request/response logic.
+- `prompt/`: prompt templates and prompt evolution logic for the original pipeline.
+- `heuristics/`: Harmony Search framework and population evolution.
+- `model/`: original optimization models.
+- `edge_uav/`: Edge-UAV data model, prompts, scenario generation, and optimization blocks.
+- `simulator/`: simulation and evaluation logic for the original pipeline.
+- `tests/`: unit and integration tests.
+- `文档/`: design notes, formula derivations, implementation plans, audits, and paper materials.
+
+### Level 3: Where To Read Next
+
+Read this section if you need targeted documentation instead of reading code directly.
+
+#### If you are new to the project
+
+- [文档导航_渐进式披露版](./文档/00_总览/文档导航_渐进式披露版.md)
+- [仿真参数说明_Simulation_Setup](./文档/00_总览/仿真参数说明_Simulation_Setup.md)
+- [project_structure_analysis](./文档/00_总览/project_structure_analysis.md)
+
+#### If you want the mathematical model
+
+- [公式与两层解耦整合版_最新版_2026-03-24](./文档/10_模型与公式/公式与两层解耦整合版_最新版_2026-03-24.md)
+- [公式20_两层解耦](./文档/10_模型与公式/公式20_两层解耦.md)
+- [底层变量清单](./文档/10_模型与公式/底层变量清单.md)
+- [图片变量映射分析](./文档/10_模型与公式/图片变量映射分析.md)
+
+#### If you want implementation plans
+
+- [场景生成器设计方案](./文档/20_架构与实现/场景生成器设计方案.md)
+- [precompute_analysis](./文档/20_架构与实现/precompute_analysis.md)
+- [Phase6_Step2_resource_alloc详细实施计划](./文档/20_架构与实现/Phase6_Step2_resource_alloc详细实施计划.md)
+- [Phase6_BCD循环实施计划](./文档/20_架构与实现/Phase6_BCD循环实施计划.md)
+
+#### If you want tests and diagnostics
+
+- [S7_e2e_test_plan](./文档/30_测试与执行/S7_e2e_test_plan.md)
+- [首次试跑计划_Phase5_pipeline](./文档/30_测试与执行/首次试跑计划_Phase5_pipeline.md)
+- [Phase5_LLM调用问题诊断报告](./文档/40_审查与诊断/Phase5_LLM调用问题诊断报告.md)
+- [代码清理审查报告_2026-03-23](./文档/40_审查与诊断/代码清理审查报告_2026-03-23.md)
+
+#### If you are writing the paper
+
+- [项目文档_MoD原始参考](./文档/50_论文材料/项目文档_MoD原始参考.md)
+- [chapter1/1_绪论](./文档/50_论文材料/chapter1/1_绪论.md)
+- [chapter3/3.1_系统架构](./文档/50_论文材料/chapter3/3.1_系统架构.md)
+- [chapter3/3.2_信道与通信模型](./文档/50_论文材料/chapter3/3.2_信道与通信模型.md)
+- [chapter3/3.3_任务卸载与边缘计算模型](./文档/50_论文材料/chapter3/3.3_任务卸载与边缘计算模型.md)
+- [chapter3/3.4_无人机轨迹与能耗模型](./文档/50_论文材料/chapter3/3.4_无人机轨迹与能耗模型.md)
+- [chapter3/3.5_联合优化问题建模](./文档/50_论文材料/chapter3/3.5_联合优化问题建模.md)
+
+## Method Overview
+
+<p align="center">
+  <img src="./image/unbalancedWorld.png" alt="Unbalanced world" style="width:80%; height:auto;">
+</p>
+
+<p align="center">
+  <img src="./image/workFlow.png" alt="Workflow" style="width:80%; height:auto;">
+</p>
+
+The method combines semantic search over objectives with rigorous operational optimization:
+
+- `LLM`: proposes strategic objective logic.
+- `Harmony Search`: explores the prompt/objective space.
+- `Optimizer + Simulator`: checks feasibility and measures actual performance.
+
+This design keeps the creative part soft and the constraint part hard.
+
+## Edge-UAV Adaptation
+
+The Edge-UAV branch targets computational task offloading from mobile devices to UAV-mounted edge servers.
+
+Its main decision blocks are:
+
+- Offloading decisions.
+- CPU frequency and resource allocation.
+- UAV trajectory planning.
+
+The intended decomposition is:
+
+1. Fix trajectory/resources and solve offloading.
+2. Fix offloading and optimize Level 2.
+3. Split Level 2 into resource allocation and trajectory optimization.
+
+Relevant code is mainly under `edge_uav/`, `heuristics/`, `config/`, and `tests/`.
+
+## Practical Notes
+
+- `Gurobi` is required for the binary optimization parts.
+- `config/env/.env` is not tracked by git and must be created locally.
+- Some LLM providers may require adapter changes in `llmAPI/`.
+- Results are typically written under `discussion/`.
 
 ## License
 
-This project is licensed under the terms of the MIT license. See LICENSE.txt for details. 
+This project is licensed under the MIT License. See `LICENSE` for details.
 
-**Note:** Some dependencies, such as Gurobi, require separate licenses. Academic users can request free licenses for research purposes. Commercial users need paid licenses.
+Some dependencies, especially Gurobi, require separate licenses.
 
 ## Citation
 
-If you use this code in your research, please cite:
+If you use this code in research, please cite:
 
-```
+```bibtex
 @inproceedings{llm-guided-mod-optimization,
-    title={Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems},
-    author={Yi Zhang, Yushen Long, Yun Ni, Liping Huang, Xiaohong Wang, Jun Liu},
-    booktitle={Conference on Neural Information Processing Systems (NeurIPS)},
-    year={2025}
+  title={Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems},
+  author={Yi Zhang, Yushen Long, Yun Ni, Liping Huang, Xiaohong Wang, Jun Liu},
+  booktitle={Conference on Neural Information Processing Systems (NeurIPS)},
+  year={2025}
 }
 ```

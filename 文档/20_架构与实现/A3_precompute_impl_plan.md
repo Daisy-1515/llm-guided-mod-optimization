@@ -2,7 +2,7 @@
 
 > 日期：2026-03-18
 > 目标文件：`edge_uav/model/precompute.py`
-> 依赖文档：`文档/precompute_analysis.md` §7（A2 接口设计）
+> 依赖文档：`文档/20_架构与实现/precompute_analysis.md` §7（A2 接口设计）
 > 上游：`edge_uav/data.py`、`config/config.py`
 > 下游：`edge_uav/model/offloading.py`（OffloadingModel）
 
