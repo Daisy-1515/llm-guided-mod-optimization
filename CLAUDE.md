@@ -17,30 +17,22 @@
 
 ---
 
-## 当前状态
+## 当前状态（自动更新）
 
-**更新时间**: 2026-03-25 20:30
+**更新时间**: 2026-03-26 23:54:01
 
-| 项 | 状态 |
-|------|------|
-| **Phase** | 🟡 Phase⑥ in progress |
-| **Latest Run** | `discussion/20260325_152149/` (S2/S3/S4 PASS) |
-| **Next** | Phase⑥ Step3: SOCP 修复（7步，25-26h） |
-| **LLM Model** | qwen3.5-plus（推荐） |
-| **HS Params** | popSize=5, iteration=10 |
+### 项目进度
+- **Phase Status**: 🟡 Phase⑥ in progress (Step1/2/3 in development)
+- **Latest Commit**: 06c8d22 docs: update CLAUDE.md environment guidelines + adjust trajectory SCA parameters
 
-### 关键里程碑
+### 最新运行结果
+- **Latest Run**: `20260325_152149/` (10 generations)
+- **Status**: Check with `python analyze_results.py --run-dir 20260325_152149/`
 
-- ✅ **Phase⑤** (2026-03-22): 全流程 S1-S4 通过
-- 🟡 **Phase⑥ Step3** (2026-03-25): DCP 非凸性修复计划制定（可执行）
-  - Step1 ✅ Propulsion model
-  - Step2 ✅ Resource allocation
-  - Step3 🟡 Trajectory optimization (SOCP 改写)
-  - Step4 待: HS + BCD 集成
-
-详见 [`文档/INDEX.md` 的「当前进度」](文档/INDEX.md)
-
----
+### LLM 配置
+- **LLM Model**: `qwen3.5-plus` (config/setting.cfg:7)
+- **HS Parameters**: popSize=5, iteration=10
+- **Endpoint**: CloseAI (api.openai-proxy.org)
 
 ## ⚡ 快速命令
 
