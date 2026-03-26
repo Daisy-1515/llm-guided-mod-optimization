@@ -154,6 +154,13 @@ def dynamic_obj_func(self):
     self.model.setObjective(gb.quicksum(w * c for w, c in zip(costs, weights)), gb.GRB.MINIMIZE)
 """
         
+        # ---- Phase⑥ Step4 BCD 循环参数 ----
+        self.max_bcd_iter = 5             # 外层最大迭代次数
+        self.eps_bcd = 1e-3               # 相对收敛容差
+        self.max_inner_bcd = 3            # Level-2 内层最大迭代（未来扩展）
+        self.cost_rollback_delta = 0.05    # 成本回滚阈值（相对增长率）
+        self.max_rollbacks = 2             # 最大回滚次数（防无限循环）
+        
     def get_default_obj(self):
         return self.default_obj
     
