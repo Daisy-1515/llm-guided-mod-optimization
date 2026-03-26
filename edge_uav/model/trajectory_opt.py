@@ -238,25 +238,16 @@ def solve_trajectory_sca(
             break
 
     # ========== Step 2: Compute per-UAV energy ==========
-    per_uav_energy = {}
-    for j in scenario.uavs:
-        q_j = {t: q_ref[j][t] for t in range(T)}
-        speed_sq = {}
-        for t in range(T - 1):
-            delta_q = np.array(q_j[t + 1]) - np.array(q_j[t])
-            v_sq = np.sum(delta_q ** 2) / (delta ** 2)
-            speed_sq[t] = v_sq
-
-        E_j = total_flight_energy(
-            speed_sq, delta, T,
-            eta_1=traj_params.eta_1,
-            eta_2=traj_params.eta_2,
-            eta_3=traj_params.eta_3,
-            eta_4=traj_params.eta_4,
-            v_tip=traj_params.v_tip,
-            include_terminal_hover=False,
-        )
-        per_uav_energy[j] = E_j
+    per_uav_energy = total_flight_energy(
+        q_ref,
+        delta,
+        eta_1=traj_params.eta_1,
+        eta_2=traj_params.eta_2,
+        eta_3=traj_params.eta_3,
+        eta_4=traj_params.eta_4,
+        v_tip=traj_params.v_tip,
+        include_terminal_hover=False,
+    )
 
     # ========== Step 3: Assemble result ==========
     result = TrajectoryResult(
@@ -388,6 +379,74 @@ def _extract_active_offloads(
     return active
 
 
+def _add_communication_delay_socp_constraint(
+    constraints: list,
+    pos_diff: cp.Expression,
+    H: float,
+    rate_safe: cp.Expression,
+    tau_comm_budget: float,
+    *,
+    name_suffix: str = "",
+) -> None:
+    """Add DCP-compliant SOCP communication delay constraints.
+
+    Rewrite
+        2 * sqrt(H^2 + ||pos_diff||_2^2) / rate_safe <= tau_comm_budget
+    into the SOCP-friendly form
+        ||[H, pos_diff[0], pos_diff[1]]||_2 <= s
+        2 * s <= tau_comm_budget * rate_safe
+
+    The helper appends constraints directly to the mutable ``constraints`` list
+    because the CVXPY Problem object is assembled only after all constraints
+    have been collected.
+    """
+    s_var = cp.Variable(
+        nonneg=True,
+        name=f"comm_dist_aux_{name_suffix}" if name_suffix else None,
+    )
+
+    # SOCP distance epigraph:
+    # sqrt(H^2 + ||pos_diff||_2^2) = ||[H, dx, dy]||_2 <= s
+    dist_vec = cp.hstack([H, pos_diff[0], pos_diff[1]])
+    constraints.append(cp.norm(dist_vec, 2) <= s_var)
+
+    # Keep the rate lower bound strictly positive so the delay surrogate
+    # remains well-defined in the SOCP reformulation.
+    constraints.append(rate_safe >= 1e-12)
+
+    # Delay inequality:
+    # 2 * distance / rate <= tau  <=>  2 * distance <= tau * rate.
+    constraints.append(2.0 * s_var <= tau_comm_budget * rate_safe)
+
+
+def _add_safety_separation_socp_constraint(
+    constraints: list,
+    d_bar: np.ndarray,
+    delta_q: cp.Expression,
+    d_safe: float,
+    slack_penalty: float,
+    objective_terms: list,
+    name_suffix: str,
+) -> cp.Variable:
+    """Add the SCA safe-separation constraint with explicit slack penalty.
+
+    This preserves the current SCA linearization
+        2 * d_bar^T * delta_q - ||d_bar||^2 + delta >= d_safe^2
+    while standardizing slack creation and objective penalization so the model
+    aligns with the Phase 6 Step 3 plan form rho_k * sum(delta_{jk}^t).
+
+    Note:
+        This remains an affine SCA constraint inside the SOCP-compatible
+        subproblem; it is not a new SOC reformulation.
+    """
+    slack_var = cp.Variable(nonneg=True, name=f"safe_slack_{name_suffix}")
+    d_bar_norm_sq = float(np.sum(d_bar ** 2))
+    lhs = 2.0 * d_bar @ delta_q - d_bar_norm_sq + slack_var
+    constraints.append(lhs >= d_safe ** 2)
+    objective_terms.append(slack_penalty * slack_var)
+    return slack_var
+
+
 def _build_sca_subproblem(
     scenario: EdgeUavScenario,
     q_ref: Trajectory2D,
@@ -417,6 +476,7 @@ def _build_sca_subproblem(
     q_var = {j: {t: cp.Variable(2) for t in range(T)} for j in uavs}
     speed_sq = {j: {t: cp.Variable() for t in range(T - 1)} for j in uavs}
     slack_safe = {}
+    objective_terms = []
 
     constraints = []
     obj_propulsion = 0.0
@@ -452,8 +512,10 @@ def _build_sca_subproblem(
             # ||Δq|| ≤ v_max · δ
             max_dist = traj_params.v_max * delta
             constraints.append(norm_sq <= (max_dist ** 2))
-            # Also link speed_sq
-            constraints.append(speed_sq[j][t] == norm_sq / (delta ** 2))
+            # DCP-compliant epigraph link:
+            # speed_sq >= ||delta_q||^2 / delta^2
+            # <=> ||delta_q||^2 <= delta^2 * speed_sq
+            constraints.append(norm_sq <= (delta ** 2) * speed_sq[j][t])
             # speed_sq[j][t] >= 0
             constraints.append(speed_sq[j][t] >= 0)
 
@@ -511,26 +573,29 @@ def _build_sca_subproblem(
         else:
             w_i = (x_max / 2, y_max / 2)
 
-        # Distance squared from UAV j to base station for task i
+        # Horizontal position difference from UAV j to base station for task i
         pos_diff = q_var[j][t] - np.array(w_i, dtype=float)
-        z = cp.sum_squares(pos_diff) + H ** 2
 
         # Rate lower bound (using pre-computed reference from q_ref)
-        z_ref = np.sum((np.array(q_ref[j][t], dtype=float) - np.array(w_i, dtype=float)) ** 2) + H ** 2
+        z_ref = np.sum(
+            (np.array(q_ref[j][t], dtype=float) - np.array(w_i, dtype=float)) ** 2
+        ) + H ** 2
         z_ref = max(z_ref, 1e-12)
 
-        rate_lb_expr = _rate_lower_bound_expr(
-            z, z_ref, H, B_up, SNR_default
+        rate_safe = _rate_lower_bound_expr(
+            cp.sum_squares(pos_diff) + H ** 2,
+            z_ref,
+            H,
+            B_up,
+            SNR_default,
         )
 
-        # Avoid division by very small rate: add small lower bound
-        rate_safe = cp.maximum(rate_lb_expr, 1e-12)
-
-        # Delay = 2√(H² + ||q_j - w_i||²) / rate
-        dist_from_height = cp.sqrt(z)
-        delay_ub = 2.0 * dist_from_height * cp.inv_pos(rate_safe)
-
-        constraints.append(delay_ub <= tau_comm_budget + 1e-9)
+        # Rewrite the communication delay constraint in SOCP form to avoid
+        # the non-DCP product sqrt(z) * inv_pos(rate_safe).
+        _add_communication_delay_socp_constraint(
+            constraints, pos_diff, H, rate_safe, tau_comm_budget,
+            name_suffix=f"{j}_{i}_{t}"
+        )
 
     # (4f) Safe distance constraint (SCA linearization, only 0 < t < T-1)
     if traj_params.d_safe > 0:
@@ -539,23 +604,24 @@ def _build_sca_subproblem(
                 if j >= k:
                     continue
                 for t in range(1, T - 1):  # interim only
-                    slack_jkt = cp.Variable()
-                    slack_safe[(j, k, t)] = slack_jkt
-                    constraints.append(slack_jkt >= 0)
-
                     # Linearization at reference point
                     # 2 · d_bar^T · (q_j - q_k) - ||d_bar||² + slack ≥ d_safe²
                     d_bar = np.array(q_ref[j][t], dtype=float) - np.array(q_ref[k][t], dtype=float)
-                    d_bar_norm_sq = np.sum(d_bar ** 2)
 
                     delta_q = q_var[j][t] - q_var[k][t]
-                    lhs = 2.0 * d_bar @ delta_q - d_bar_norm_sq + slack_jkt
-
-                    constraints.append(lhs >= traj_params.d_safe ** 2)
+                    slack_safe[(j, k, t)] = _add_safety_separation_socp_constraint(
+                        constraints=constraints,
+                        d_bar=d_bar,
+                        delta_q=delta_q,
+                        d_safe=traj_params.d_safe,
+                        slack_penalty=safe_slack_penalty,
+                        objective_terms=objective_terms,
+                        name_suffix=f"{j}_{k}_{t}",
+                    )
 
     # Objective: minimize propulsion energy + safe distance slack penalty
-    obj_slack = cp.sum([slack_safe[key] for key in slack_safe.keys()])
-    objective = cp.Minimize(obj_propulsion + safe_slack_penalty * obj_slack)
+    obj_slack = cp.sum(cp.hstack(objective_terms)) if objective_terms else 0.0
+    objective = cp.Minimize(obj_propulsion + obj_slack)
 
     problem = cp.Problem(objective, constraints)
 
@@ -668,28 +734,17 @@ def _evaluate_true_objective(
     Returns:
         Total propulsion energy (J) summed over all UAVs.
     """
-    T = len(scenario.time_slots)
     delta = float(scenario.meta.get('delta', 0.5))
-    total_energy = 0.0
-
-    for j in scenario.uavs:
-        q_j = {t: q[j][t] for t in range(T)}
-        speed_sq = {}
-
-        for t in range(T - 1):
-            delta_q = np.array(q_j[t + 1]) - np.array(q_j[t])
-            v_sq = np.sum(delta_q ** 2) / (delta ** 2)
-            speed_sq[t] = v_sq
-
-        E_j = total_flight_energy(
-            speed_sq, delta, T,
-            eta_1=traj_params.eta_1,
-            eta_2=traj_params.eta_2,
-            eta_3=traj_params.eta_3,
-            eta_4=traj_params.eta_4,
-            v_tip=traj_params.v_tip,
-            include_terminal_hover=False,
-        )
-        total_energy += E_j
+    per_uav_energy = total_flight_energy(
+        q,
+        delta,
+        eta_1=traj_params.eta_1,
+        eta_2=traj_params.eta_2,
+        eta_3=traj_params.eta_3,
+        eta_4=traj_params.eta_4,
+        v_tip=traj_params.v_tip,
+        include_terminal_hover=False,
+    )
+    total_energy = sum(per_uav_energy.values())
 
     return total_energy
