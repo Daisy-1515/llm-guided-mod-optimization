@@ -46,19 +46,25 @@
 
 ```bash
 # 环境
-uv sync                                # 安装依赖
+uv sync                                          # 安装依赖
 
-# 运行
-python testEdgeUav.py                  # Edge UAV 管道
-python testAll.py                      # 原始 MoD 系统
+# 运行（务必使用 uv run python，避免系统多版本冲突）
+uv run python testEdgeUav.py                     # Edge UAV 管道
+uv run python testAll.py                         # 原始 MoD 系统
 
 # 验证
-python analyze_results.py --run-dir discussion/20260325_152149/
-pytest tests/ -v                       # 62 测试
+uv run python analyze_results.py --run-dir discussion/20260325_152149/
+uv run pytest tests/ -v                          # 66 测试
 
 # 诊断
-python check_llm_api.py                # LLM API 连接检查
+uv run python check_llm_api.py                   # LLM API 连接检查
 ```
+
+**⚠️ Python 环境说明**：
+- **务必使用 `uv run python`** 运行所有 Python 脚本，避免系统多版本 Python 冲突
+- 使用 `uv run pytest` 而非直接 `pytest`（确保正确的虚拟环境）
+- 错误示例 ❌：`python script.py`
+- 正确示例 ✅：`uv run python script.py`
 
 详见 [`文档/配置指南.md`](文档/配置指南.md) 的「快速命令参考」
 

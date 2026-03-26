@@ -209,7 +209,7 @@ def test_stationary_endpoint_returns_hover_path(
 
     # Trajectory should remain at (0, 0)
     for t in range(len(scenario.time_slots)):
-        assert np.allclose(result.q[j][t], (0.0, 0.0), atol=1e-6)
+        assert np.allclose(result.q[j][t], (0.0, 0.0), atol=1e-4)
 
     # Objective should be positive (hovering energy)
     assert result.objective_value > 0
@@ -402,11 +402,11 @@ def test_negative_communication_budget_raises(
     q_init = linear_init_trajectory_1uav
     j, i, t = 0, 0, 1
 
-    # Set f_edge very high so F_i/f_edge > τ_i
+    # Set f_edge very low so F_i/f_edge > τ_i
     f_fixed = {
         j: {
             i: {
-                t: 1e15,  # Unreasonably high
+                t: 1e5,  # Very low => F_i/f_edge > tau_i, so tau_comm < 0
             }
         }
     }

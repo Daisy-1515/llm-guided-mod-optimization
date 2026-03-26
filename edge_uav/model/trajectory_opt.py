@@ -87,7 +87,7 @@ def solve_trajectory_sca(
     params: PrecomputeParams,
     traj_params: TrajectoryOptParams,
     *,
-    max_sca_iter: int = 5,
+    max_sca_iter: int = 100,
     eps_sca: float = 1e-3,
     safe_slack_penalty: float = 1e3,
     solver_fallback: tuple[str, ...] = ("CLARABEL", "ECOS", "SCS"),
@@ -101,7 +101,7 @@ def solve_trajectory_sca(
         q_init: Initial trajectory dict[j][t] = (x, y)
         params: PrecomputeParams (distances, rates, time slot duration δ)
         traj_params: TrajectoryOptParams (η_1..η_4, v_tip, v_max, d_safe)
-        max_sca_iter: Max SCA iterations (default 5)
+        max_sca_iter: Max SCA iterations (default 100)
         eps_sca: Relative convergence tolerance (default 1e-3)
         safe_slack_penalty: Penalty weight for safe distance slack (default 1e3)
         solver_fallback: Solvers to try in order (default CLARABEL → ECOS → SCS)
