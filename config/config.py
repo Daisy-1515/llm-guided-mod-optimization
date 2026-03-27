@@ -82,6 +82,13 @@ class configPara:
         self.eta_3 = 0.0151     # 机身阻力比
         self.eta_4 = 0.0048     # 空气密度系数
 
+        # ---- Phase⑥ Step4 BCD 循环集成开关与参数 ----
+        self.use_bcd_loop = False       # Phase⑥ Step4 Day 2: Level 1+2a+2b 集成开关（默认 False 保证向下兼容）
+        self.bcd_max_iter = 5           # BCD 最大迭代数
+        self.bcd_eps = 1e-3             # BCD 收敛容差（相对成本差）
+        self.bcd_rollback_delta = 0.05  # BCD 成本回滚阈值（百分比，5%）
+        self.bcd_max_rollbacks = 2      # BCD 最大回滚次数
+
         # ---- Phase⑥ BCD 循环参数（Level-2b 轨迹优化）----
         self.v_traj_max = 15.0          # 轨迹优化最大速度 (m/s)
         self.d_safe_traj = 5.0          # 轨迹优化安全距离 (m)
@@ -282,6 +289,13 @@ def dynamic_obj_func(self):
 
         # 场景随机种子
         self.scenario_seed = self.get_config_value('edgeUavSeed', 'scenario_seed', self.scenario_seed, cast=int)
+
+        # ---- Phase⑥ Step4 BCD 循环集成开关与参数 ----
+        self.use_bcd_loop = self.get_config_value('edgeUavBCDIntegration', 'use_bcd_loop', self.use_bcd_loop, cast=bool)
+        self.bcd_max_iter = self.get_config_value('edgeUavBCDIntegration', 'bcd_max_iter', self.bcd_max_iter, cast=int)
+        self.bcd_eps = self.get_config_value('edgeUavBCDIntegration', 'bcd_eps', self.bcd_eps, cast=float)
+        self.bcd_rollback_delta = self.get_config_value('edgeUavBCDIntegration', 'bcd_rollback_delta', self.bcd_rollback_delta, cast=float)
+        self.bcd_max_rollbacks = self.get_config_value('edgeUavBCDIntegration', 'bcd_max_rollbacks', self.bcd_max_rollbacks, cast=int)
 
         # ---- Phase⑥ BCD 循环参数 ----
         self.v_traj_max = self.get_config_value('edgeUavBCD', 'v_traj_max', self.v_traj_max, cast=float)

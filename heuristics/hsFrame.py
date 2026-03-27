@@ -84,9 +84,13 @@ class HarmonySearchSolver:
             self.save_population(sortPop, gen_num)
             self._summarize_gen(f"Gen {gen_num}", sortPop)
 
-        # B3: 首跑统计摘要
+        # B3: 首跑统计摘要 + 保存最终种群
         best_score = sortPop[0]["evaluation_score"] if sortPop else None
         print(f"[HS] Optimization complete  out={self.out_dir}  best_score={best_score}")
+
+        # Phase⑥ Step4: 保存最终种群供后续访问
+        self.final_population = sortPop
+        return sortPop
 
 # Example usage
 if __name__ == "__main__":

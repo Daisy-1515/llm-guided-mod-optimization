@@ -105,10 +105,12 @@ def test_t3_generate_new_harmony_way4(edge_uav_bundle):
     seen_ways = set()
     random.seed(42)
     for _ in range(200):
-        p, w = pop.generate_new_harmony(mini_pop)
+        p, w, parent_snapshot = pop.generate_new_harmony(mini_pop)
         # Edge UAV 返回 scalar（非 list）
         assert isinstance(w, str), f"Expected scalar way, got {type(w)}"
         assert not isinstance(p, list), f"Expected scalar parent, got list"
+        # parent_snapshot 可以是 None（如果 BCD 禁用或初始化失败）
+        assert parent_snapshot is None or hasattr(parent_snapshot, '__dict__'), f"Unexpected parent_snapshot type: {type(parent_snapshot)}"
         seen_ways.add(w)
 
     # way1（HMCR 外）、way2（PAR 外）、way3/way4（PAR 内）都应出现

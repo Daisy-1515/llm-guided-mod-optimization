@@ -20,6 +20,8 @@ from edge_uav.model.precompute import (
     make_initial_level2_snapshot,
     precompute_offloading_inputs,
 )
+from edge_uav.model.trajectory_opt import TrajectoryOptParams
+from edge_uav.model.bcd_loop import run_bcd_loop, BCDResult
 from edge_uav.prompt.mod_prompt import EdgeUavModPrompts
 from heuristics.hs_way_constants import (
     VALID_EDGE_UAV_WAYS,
@@ -145,6 +147,108 @@ class hsIndividualEdgeUav:
     def _synthesize_llm_response(self):
         """构造符合消费方期望的合成 JSON 字符串。"""
         return json.dumps({"obj_code": _EDGE_UAV_DEFAULT_OBJ})
+
+    # ------------------------------------------------------------------
+    # Phase⑥ Step4 BCD 循环集成：参数初始化助手方法
+    # ------------------------------------------------------------------
+
+    def _initialize_bcd_params(self):
+        """初始化 BCD 循环所需的参数。
+
+        处理 4 种参数组合情况：
+          Case A: shared_precompute=True (self.params=None)
+          Case B: shared_precompute=False (self.params 已设置)
+          Case C: 多代热启动 (self._parent_snapshot 可用)
+
+        Returns:
+            (PrecomputeParams, TrajectoryOptParams, Level2Snapshot)
+
+        Raises:
+            ValueError: 若配置无效或参数初始化失败
+        """
+        # Case A: shared_precompute=True，需要从 config 构造参数
+        if self.params is None:
+            try:
+                params = PrecomputeParams.from_config(self.config)
+            except Exception as e:
+                raise ValueError(f"BCD param init: PrecomputeParams.from_config failed: {e}")
+            initial_snapshot = make_initial_level2_snapshot(self.scenario)
+        # Case B: shared_precompute=False，已有 self.params
+        else:
+            params = self.params
+            # Case C: 检查是否有父代热启动快照
+            if hasattr(self, '_parent_snapshot') and self._parent_snapshot is not None:
+                initial_snapshot = self._parent_snapshot
+            else:
+                initial_snapshot = self.snapshot
+
+        # 构造轨迹优化参数 (从 config 提取)
+        traj_params = self._create_trajectory_opt_params()
+
+        return params, traj_params, initial_snapshot
+
+    def _create_trajectory_opt_params(self):
+        """从 config 提取轨迹优化参数。
+
+        Returns:
+            TrajectoryOptParams 实例
+
+        Raises:
+            ValueError: 若配置缺少必要参数
+        """
+        required_attrs = ['eta_1', 'eta_2', 'eta_3', 'eta_4', 'v_tip']
+        for attr in required_attrs:
+            if not hasattr(self.config, attr):
+                raise ValueError(
+                    f"BCD trajectory params: config missing required attribute '{attr}'"
+                )
+
+        # 映射：config.v_U_max → v_max
+        v_max = float(getattr(self.config, 'v_U_max', getattr(self.config, 'v_max', 30.0)))
+
+        # 映射：config.d_safe_traj → d_safe
+        d_safe = float(getattr(self.config, 'd_safe_traj', getattr(self.config, 'd_safe', 5.0)))
+
+        return TrajectoryOptParams(
+            eta_1=float(self.config.eta_1),
+            eta_2=float(self.config.eta_2),
+            eta_3=float(self.config.eta_3),
+            eta_4=float(self.config.eta_4),
+            v_tip=float(self.config.v_tip),
+            v_max=v_max,
+            d_safe=d_safe,
+        )
+
+    def _adapt_bcd_result_to_legacy(self, bcd_result, offloading_outputs, precompute_result):
+        """将 BCDResult 适配为遗留接口格式。
+
+        输入：
+            bcd_result: BCDResult 实例
+            offloading_outputs: dict，Level-1 卸载决策
+            precompute_result: PrecomputeResult
+
+        返回：
+            (feasible, cost, full_info_bcd_meta)
+
+        其中 full_info_bcd_meta 包含：
+            - bcd_converged: bool
+            - bcd_iterations: int
+            - bcd_cost_history: list[float]
+            - solution_details: dict
+            - optimal_snapshot: Level2Snapshot (用于下一代热启动)
+        """
+        feasible = bcd_result.converged
+        cost = bcd_result.total_cost
+
+        full_info_bcd_meta = {
+            "bcd_converged": bool(bcd_result.converged),
+            "bcd_iterations": int(bcd_result.bcd_iterations),
+            "bcd_cost_history": list(bcd_result.cost_history),
+            "solution_details": dict(bcd_result.solution_details) if bcd_result.solution_details else {},
+            "optimal_snapshot": bcd_result.optimal_snapshot,  # Phase⑥ Step4 Day 2: 热启动快照
+        }
+
+        return feasible, cost, full_info_bcd_meta
 
     # ------------------------------------------------------------------
     # 场景信息格式化
@@ -279,44 +383,112 @@ class hsIndividualEdgeUav:
                 full_info["llm_status"] = "parse_error"
                 full_info["llm_error"] = f"extract_code_hsIndiv returned empty for way={way}"
 
-        # 3) 求解 Level-1 BLP
-        model = OffloadingModel(
-            tasks=self.scenario.tasks,
-            uavs=self.scenario.uavs,
-            time_list=self.scenario.time_slots,
-            D_hat_local=self.precompute_result.D_hat_local,
-            D_hat_offload=self.precompute_result.D_hat_offload,
-            E_hat_comp=self.precompute_result.E_hat_comp,
-            alpha=getattr(self.config, "alpha", 1.0),
-            gamma_w=getattr(self.config, "gamma_w", 1.0),
-            dynamic_obj_func=func,
-        )
+        # 3) 求解：使用 BCD 循环（Level 1+2a+2b）或降级至 Level 1
+        bcd_enabled = getattr(self.config, 'use_bcd_loop', False)
+        feasible, cost, score = False, -1.0, float(INVALID_OUTPUT_PENALTY)
+        bcd_meta = {}
 
-        try:
-            feasible, cost = model.solveProblem()
-            outputs = model.getOutputs()
-            score = evaluate_solution(
-                outputs, self.precompute_result, self.scenario,
-            )
-        except Exception as exc:
-            print(f"[hsIndividualEdgeUav] solver exception: {exc}")
-            feasible, cost, score = False, -1.0, float(INVALID_OUTPUT_PENALTY)
+        if bcd_enabled:
+            # Phase⑥ Step4：尝试 BCD 循环集成
+            try:
+                params, traj_params, initial_snapshot = self._initialize_bcd_params()
+                bcd_result = run_bcd_loop(
+                    scenario=self.scenario,
+                    config=self.config,
+                    params=params,
+                    traj_params=traj_params,
+                    dynamic_obj_func=func,
+                    initial_snapshot=initial_snapshot,
+                    max_bcd_iter=getattr(self.config, 'bcd_max_iter', 5),
+                    eps_bcd=getattr(self.config, 'bcd_eps', 1e-3),
+                    cost_rollback_delta=getattr(self.config, 'bcd_rollback_delta', 0.05),
+                    max_rollbacks=getattr(self.config, 'bcd_max_rollbacks', 2),
+                )
+                # 适配返回值
+                feasible, cost, bcd_meta = self._adapt_bcd_result_to_legacy(
+                    bcd_result, bcd_result.offloading_outputs, self.precompute_result
+                )
+                # 重新评分（使用 BCD 最优快照）
+                score = evaluate_solution(
+                    bcd_result.offloading_outputs, self.precompute_result, self.scenario,
+                )
+                full_info["bcd_enabled"] = True
+                full_info["bcd_meta"] = bcd_meta
+
+            except Exception as bcd_exc:
+                # BCD 失败：降级至 Level 1（保留异常记录）
+                print(f"[hsIndividualEdgeUav] BCD loop failed: {bcd_exc}, falling back to Level 1")
+                full_info["bcd_enabled"] = True
+                full_info["bcd_error"] = str(bcd_exc)
+
+                # Level 1 降级求解
+                try:
+                    model = OffloadingModel(
+                        tasks=self.scenario.tasks,
+                        uavs=self.scenario.uavs,
+                        time_list=self.scenario.time_slots,
+                        D_hat_local=self.precompute_result.D_hat_local,
+                        D_hat_offload=self.precompute_result.D_hat_offload,
+                        E_hat_comp=self.precompute_result.E_hat_comp,
+                        alpha=getattr(self.config, "alpha", 1.0),
+                        gamma_w=getattr(self.config, "gamma_w", 1.0),
+                        dynamic_obj_func=func,
+                    )
+                    feasible, cost = model.solveProblem()
+                    outputs = model.getOutputs()
+                    score = evaluate_solution(
+                        outputs, self.precompute_result, self.scenario,
+                    )
+                except Exception as fallback_exc:
+                    print(f"[hsIndividualEdgeUav] Level 1 fallback also failed: {fallback_exc}")
+                    feasible, cost, score = False, -1.0, float(INVALID_OUTPUT_PENALTY)
+        else:
+            # use_bcd_loop=False：仅 Level 1（原始逻辑）
+            try:
+                model = OffloadingModel(
+                    tasks=self.scenario.tasks,
+                    uavs=self.scenario.uavs,
+                    time_list=self.scenario.time_slots,
+                    D_hat_local=self.precompute_result.D_hat_local,
+                    D_hat_offload=self.precompute_result.D_hat_offload,
+                    E_hat_comp=self.precompute_result.E_hat_comp,
+                    alpha=getattr(self.config, "alpha", 1.0),
+                    gamma_w=getattr(self.config, "gamma_w", 1.0),
+                    dynamic_obj_func=func,
+                )
+                feasible, cost = model.solveProblem()
+                outputs = model.getOutputs()
+                score = evaluate_solution(
+                    outputs, self.precompute_result, self.scenario,
+                )
+                full_info["bcd_enabled"] = False
+            except Exception as exc:
+                print(f"[hsIndividualEdgeUav] Level 1 solver exception: {exc}")
+                feasible, cost, score = False, -1.0, float(INVALID_OUTPUT_PENALTY)
+                full_info["bcd_enabled"] = False
 
         # 4) 填充求解结果
         if extract_failed:
             # P1-2: 消费方 shrink_token_size 依赖此精确哨兵跳过提取
             full_info["response_format"] = self._FORMAT_ERROR_SENTINEL
         else:
-            full_info["response_format"] = (
-                model.error_message or "None Obj. Using default obj."
-            )
+            if bcd_enabled and not bcd_meta:
+                # BCD 启用但已降级，show 原始错误信息
+                full_info["response_format"] = "BCD fallback to Level 1"
+            else:
+                # 原始 Level 1 响应格式
+                full_info["response_format"] = (
+                    model.error_message if 'model' in locals() and hasattr(model, 'error_message')
+                    else "None Obj. Using default obj."
+                )
         full_info["feasible"] = bool(feasible)
         full_info["solver_cost"] = float(cost)
 
         # P2-1 fix: 只有 solver 明确确认"Your obj function is correct"才算自定义成功
         if not full_info["used_default_obj"] and func is not None:
-            if model.error_message != self._OBJ_SUCCESS_MSG:
-                full_info["used_default_obj"] = True
+            if 'model' in locals() and hasattr(model, 'error_message'):
+                if model.error_message != self._OBJ_SUCCESS_MSG:
+                    full_info["used_default_obj"] = True
 
         # 5) 记录到 promptHistory
         self.promptHistory["evaluation_score"] = float(score)
