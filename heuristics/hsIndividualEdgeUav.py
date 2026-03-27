@@ -245,7 +245,7 @@ class hsIndividualEdgeUav:
             "bcd_iterations": int(bcd_result.bcd_iterations),
             "bcd_cost_history": list(bcd_result.cost_history),
             "solution_details": dict(bcd_result.solution_details) if bcd_result.solution_details else {},
-            "optimal_snapshot": bcd_result.optimal_snapshot,  # Phase⑥ Step4 Day 2: 热启动快照
+            "optimal_snapshot": bcd_result.snapshot,  # Phase⑥ Step4 Day 2: 热启动快照
         }
 
         return feasible, cost, full_info_bcd_meta

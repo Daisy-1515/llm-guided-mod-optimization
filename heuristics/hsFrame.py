@@ -37,11 +37,18 @@ class HarmonySearchSolver:
         self.sort = hsSorting()
         print(f"[HS] Solver initialized  run_id={self.run_id}  out={self.out_dir}")
 
+    @staticmethod
+    def _json_default(obj):
+        from dataclasses import asdict, is_dataclass
+        if is_dataclass(obj):
+            return asdict(obj)
+        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
     def save_population(self, pop, iteration):
         os.makedirs(self.out_dir, exist_ok=True)
         filename = os.path.join(self.out_dir, f"population_result_{iteration}.json")
         with open(filename, 'w') as f:
-            json.dump(pop, f, indent=4)
+            json.dump(pop, f, indent=4, default=self._json_default)
     
     def combine_population(self, pop1, pop2):
         return pop1+pop2

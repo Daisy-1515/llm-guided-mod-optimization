@@ -301,8 +301,9 @@ def adapt_f_edge_for_snapshot(
 ) -> Scalar3D:
     """Adapt resource allocation result f_edge into snapshot format.
 
-    ResourceAllocResult.f_edge is already in [j][i][t] format, but we verify
-    it's dense (covers all j, i, t) and meets numerical thresholds.
+    ResourceAllocResult.f_edge may be sparse on the time-slot axis (only
+    offloaded tasks have values). For snapshot compatibility, we densify to
+    [j][i][t], filling missing keys with 0.0, and validate provided values.
 
     Args:
         scenario: EdgeUavScenario with tasks, uavs, time_slots
@@ -311,45 +312,39 @@ def adapt_f_edge_for_snapshot(
         eps_freq: Minimum frequency threshold (Hz)
 
     Returns:
-        f_edge_adapted: Scalar3D [j][i][t] with floor applied
+        f_edge_adapted: Scalar3D [j][i][t], missing keys filled as 0.0
 
     Raises:
-        ValueError: If ra_result.f_edge is not dense or has invalid values
+        ValueError: If provided values are invalid (NaN/inf/negative)
     """
     f_edge = ra_result.f_edge
     tasks = scenario.tasks
     uavs = scenario.uavs
     time_slots = scenario.time_slots
 
-    # Verify density and apply floor
+    # Densify and validate values
     f_edge_adapted: Scalar3D = {}
     errors: List[str] = []
 
     for j in uavs:
         f_edge_adapted[j] = {}
-        if j not in f_edge:
-            for i in tasks:
-                for t in time_slots:
-                    errors.append(f"f_edge missing UAV {j}")
-            continue
+        f_j = f_edge.get(j, {})
 
         for i in tasks:
             f_edge_adapted[j][i] = {}
-            if i not in f_edge[j]:
-                for t in time_slots:
-                    errors.append(f"f_edge missing task {i} under UAV {j}")
-                continue
+            f_ji = f_j.get(i, {})
 
             for t in time_slots:
-                v = f_edge[j][i].get(t)
+                v = f_ji.get(t)
                 if v is None:
-                    errors.append(f"f_edge[{j}][{i}][{t}] is missing")
+                    # Missing key means "not offloaded at this slot"
+                    f_edge_adapted[j][i][t] = 0.0
                 elif not math.isfinite(v):
                     errors.append(f"f_edge[{j}][{i}][{t}] = {v} is NaN/inf")
                 elif v < 0:
                     errors.append(f"f_edge[{j}][{i}][{t}] = {v} < 0")
                 else:
-                    # Apply floor
+                    # Keep floor for existing positive allocations
                     f_edge_adapted[j][i][t] = max(v, eps_freq)
 
     if errors:
@@ -515,7 +510,6 @@ def run_bcd_loop(
                 gamma_w=float(getattr(config, "gamma_w", 1.0)),
                 dynamic_obj_func=dynamic_obj_func,
             )
-            offloading_model.setupVars()
             offloading_model.solveProblem()
             offloading_outputs = validate_offloading_outputs(
                 offloading_model.getOutputs(), scenario
@@ -536,8 +530,8 @@ def run_bcd_loop(
             )
             if not validate_resource_allocation_feasibility(ra_result, scenario):
                 logger.warning("Resource allocation may be infeasible, continuing...")
-            solution_details["resource_binding_slots"] = len(
-                ra_result.diagnostics.get("binding_slots", [])
+            solution_details["resource_binding_slots"] = int(
+                ra_result.diagnostics.get("binding_slots", 0)
             )
             logger.info(f"Level 2a resource allocation solved")
         except Exception as e:

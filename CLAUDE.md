@@ -19,20 +19,22 @@
 
 ## 当前状态（自动更新）
 
-**更新时间**: 2026-03-26 23:54:01
+**更新时间**: 2026-03-27 18:11:31
 
 ### 项目进度
-- **Phase Status**: 🟡 Phase⑥ in progress (Step1/2/3 in development)
-- **Latest Commit**: 06c8d22 docs: update CLAUDE.md environment guidelines + adjust trajectory SCA parameters
+- **Phase Status**: 🟢 Phase⑥ Step4 完成 — BCD 全链路通过
+- **Latest Commit**: 待提交（BCD 修复 4 个 bug，Level 1+2a+2b 全链路打通）
+- **Last Verified**: 冒烟测试通过（HS_POP_SIZE=2, HS_ITERATION=2）
 
 ### 最新运行结果
-- **Latest Run**: `20260325_152149/` (10 generations)
-- **Status**: Check with `python analyze_results.py --run-dir 20260325_152149/`
+- **Latest Run**: `discussion/20260327_164104/` (2 generations)
+- **Status**: ✅ BCD 循环完全执行，无降级，最优值 31.77
 
 ### LLM 配置
 - **LLM Model**: `qwen3.5-plus` (config/setting.cfg:7)
-- **HS Parameters**: popSize=5, iteration=10
+- **HS Parameters**: popSize=2, iteration=2 (冒烟); popSize=5, iteration=10 (完整)
 - **Endpoint**: CloseAI (api.openai-proxy.org)
+- **BCD Integration**: ✅ 启用 (config/setting.cfg:89-94 `use_bcd_loop=true`)
 
 ## ⚡ 快速命令
 
