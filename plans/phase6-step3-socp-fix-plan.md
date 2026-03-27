@@ -2,8 +2,12 @@
 
 **日期**：2026-03-25
 **版本**：1.0（最终版）
-**状态**：✅ 已确认，待执行
+**状态**：🗂️ 历史修复计划（后续已由 `fd723e3` 执行）
 **优先级**：🔴 阻塞项（Phase④ 里程碑）
+
+> 说明：本文是 Step3 修复前的执行计划。实际实施结果见
+> `文档/40_审查与诊断/Phase6_Step3_SOCP_实施总结.md`，后续 Phase⑥ Step4
+> 状态请以 `CLAUDE.md` 和 `文档/70_工作日记/2026-03-27.md` 为准。
 
 ---
 
@@ -630,4 +634,3 @@ python analyze_results.py --run-dir discussion/phase6_step3_test/
 **最后更新**：2026-03-25 12:30
 **状态**：✅ Ready for execution
 **优先级**：🔴 Blocking Phase④ milestone
-

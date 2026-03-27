@@ -1,5 +1,10 @@
 # Phase⑥ Step3 SOCP 实施总结
 
+> 类型：historical implementation summary
+> 时间边界：本文完成于 2026-03-26，记录 Step3 收口时的状态。
+> 后续状态：2026-03-27 已继续推进 Phase⑥ Step4；当前状态以 `CLAUDE.md`
+> 和 `文档/70_工作日记/2026-03-27.md` 为准。
+
 ## 🎯 任务目标
 将轨迹优化子问题从**非 DCP 形式**改写为**标准 SOCP 形式**，以符合 CVXPY 规范并解决求解器失败问题。
 
@@ -156,7 +161,7 @@ def _add_safety_separation_socp_constraint(..., objective_terms):
    - 原因：负预算检查逻辑在 solve_trajectory_sca() 中未实现
    - 建议：添加预验证逻辑检查 τ_comm ≥ 0
 
-### Phase⑥ Step4 准备工作
+### 当时的 Phase⑥ Step4 准备工作
 - HS + BCD 集成测试
 - 动态罚权调整（ρ_k 更新策略）
 - 管道级 E2E 验证
@@ -190,7 +195,7 @@ Co-Authored-By: Claude Sonnet 4.6
 
 **执行时间**：约 2 小时
 **状态**：✅ 完成（10/12 通过，SOCP 目标达成）
-**下一步**：Phase⑥ Step4（HS + BCD 集成）
+**当时下一步**：Phase⑥ Step4（HS + BCD 集成）
 
 **日期**：2026-03-26
 **协作者**：Claude Code + Codex MCP

@@ -14,6 +14,11 @@ It currently contains two parallel tracks:
 - The original MoD pipeline for hierarchical optimization.
 - The Edge-UAV adaptation, where task offloading, resource allocation, and UAV trajectory planning are optimized jointly.
 
+> Status note (2026-03-27): current project-level status is maintained in `CLAUDE.md`.
+> Historical plans and diagnostic reports under `plans/` and `文档/40_审查与诊断/`
+> may describe earlier pre-integration stages. For the latest Phase⑥ Step4 progress,
+> see `CLAUDE.md` and `文档/70_工作日记/2026-03-27.md`.
+
 If you only need the shortest possible mental model:
 
 1. The LLM proposes or evolves high-level objective logic.
@@ -83,16 +88,16 @@ Notes:
 #### Common Commands
 
 ```bash
-python testAll.py
-python testEdgeUav.py
-python -m pytest tests -v
-python check_llm_api.py
+uv run python testAll.py
+uv run python testEdgeUav.py
+uv run pytest tests -v
+uv run python check_llm_api.py
 ```
 
-- `python testAll.py`: original MoD pipeline.
-- `python testEdgeUav.py`: Edge-UAV pipeline.
-- `python -m pytest tests -v`: unit and integration tests.
-- `python check_llm_api.py`: quick validation of LLM connectivity.
+- `uv run python testAll.py`: original MoD pipeline.
+- `uv run python testEdgeUav.py`: Edge-UAV pipeline.
+- `uv run pytest tests -v`: unit and integration tests.
+- `uv run python check_llm_api.py`: quick validation of LLM connectivity.
 
 ### Level 2: Architecture and Code Navigation
 

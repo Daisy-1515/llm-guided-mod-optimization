@@ -4,6 +4,11 @@
 **计划编号**: binary-squishing-hare
 **版本**: 1.0
 
+> 类型：historical diagnostic snapshot
+> 时间边界：本文记录 2026-03-27 `binary-squishing-hare` 快速集成验证阶段。
+> 后续状态：同日提交 `3462563`、`b332502`、`7239a60` 已继续推进 Phase⑥ Step4。
+> 当前状态请以 `CLAUDE.md` 和 `文档/70_工作日记/2026-03-27.md` 为准。
+
 ---
 
 ## 执行总结
@@ -132,7 +137,9 @@ grep -E "eps_bcd|max_bcd_iter" config/config.py
   grep "objective\|cost" smoke_test.log
   ```
 
-**当前状态**: ℹ️ **不适用** - 当前系统是 Level 1 only，BCD 循环尚未集成
+**当前状态**: ℹ️ **历史阶段结论** - 本节描述的是快速验证阶段针对
+“尚未形成稳定 BCD 收敛日志”时的排查入口。当前仓库已进入 Step4 后续状态；
+若再遇到 BCD 不收敛，应结合最新代码路径与当前日志排查。
 
 ---
 
@@ -253,20 +260,21 @@ cat "$LATEST/population_result_0.json" | python -m json.tool | head -20
 
 ---
 
-## Phase⑥ Step4 Day 2 预告（后续工作）
+## 历史后续工作清单（已被同日后续实现部分覆盖）
 
-完成此验证后，即可启动以下后续工作：
+以下内容是 2026-03-27 当时为后续集成准备的工作清单；
+其中 HS + BCD 集成已在同日后续提交中推进，保留此节仅用于追溯时间线。
 
 ### 集成 BCD 循环到 HS 求解器
 
 修改文件：`heuristics/hsIndividualEdgeUav.py` (L283-323)
 
 ```python
-# 当前（Level 1 only）:
+# 当时（快速验证阶段的 Level 1 路径）:
 offloading_result = self.offloading_model.solveProblem()
 cost = offloading_result.objective_value
 
-# 改为（Level 1+2a+2b）:
+# 计划改为（Level 1+2a+2b）:
 from edge_uav.model.bcd_loop import run_bcd_loop
 bcd_result = run_bcd_loop(
     offloading_model=self.offloading_model,
@@ -330,12 +338,12 @@ gen1_individual.initialize_with_snapshot(best_snapshot)
 2. ✅ 验证 40+ 个单元测试（无回归）
 3. ✅ 验证完整 HS 优化流程可执行
 4. ✅ 验证成本单调性和执行效率
-5. ✅ 为 Phase⑥ Step4 Day 2 的 BCD 集成做好准备
+5. ✅ 为同日后续 Step4 集成推进提供了基线
 
-**下一步**：
-- 实施 hsIndividualEdgeUav.py 中的 BCD 循环集成（Day 2）
-- 运行完整 HS 优化（popSize=5, iteration=10）
-- 生成 NeurIPS 论文数值结果
+**后续状态**：
+- `hsIndividualEdgeUav.py` 中的 BCD 循环集成已在 2026-03-27 后续提交中推进
+- 当前项目级状态请查看 `CLAUDE.md`
+- 本指南保留用于回溯快速验证阶段的诊断入口
 
 ---
 
