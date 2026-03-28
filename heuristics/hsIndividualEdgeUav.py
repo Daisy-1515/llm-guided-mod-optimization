@@ -203,8 +203,14 @@ class hsIndividualEdgeUav:
                     f"BCD trajectory params: config missing required attribute '{attr}'"
                 )
 
-        # 映射：config.v_U_max → v_max
-        v_max = float(getattr(self.config, 'v_U_max', getattr(self.config, 'v_max', 30.0)))
+        # 映射：config.v_traj_max → v_max
+        v_max = float(
+            getattr(
+                self.config,
+                'v_traj_max',
+                getattr(self.config, 'v_U_max', getattr(self.config, 'v_max', 30.0)),
+            )
+        )
 
         # 映射：config.d_safe_traj → d_safe
         d_safe = float(getattr(self.config, 'd_safe_traj', getattr(self.config, 'd_safe', 5.0)))

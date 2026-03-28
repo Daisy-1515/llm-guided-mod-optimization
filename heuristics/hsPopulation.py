@@ -39,9 +39,12 @@ class hsPopulation:
         elif individual_type == "edge_uav":
             from heuristics.hsIndividualEdgeUav import hsIndividualEdgeUav
             self.IndividualClass = hsIndividualEdgeUav
+        elif individual_type == "edge_uav_random":
+            from heuristics.hsIndividualRandom import hsIndividualRandom
+            self.IndividualClass = hsIndividualRandom
         else:
             raise ValueError(f"Unsupported individual_type: {individual_type}")
-        self._is_edge_uav = (individual_type == "edge_uav")
+        self._is_edge_uav = individual_type in {"edge_uav", "edge_uav_random"}
 
         # Edge UAV: 预计算一次，共享给所有个体（只读，线程安全）
         self._shared_precompute = None

@@ -35,6 +35,8 @@ class HarmonySearchSolver:
 
         self.pop = hsPopulation(configPara, scenarioInfo, individual_type=individual_type)
         self.sort = hsSorting()
+        self.evaluation_history = []
+        self.generation_history = []
         print(f"[HS] Solver initialized  run_id={self.run_id}  out={self.out_dir}")
 
     @staticmethod
@@ -78,7 +80,9 @@ class HarmonySearchSolver:
     def run(self):
         print(f"[HS] Gen 0: evaluating {self.popsize} individuals ...")
         pop = self.pop.initialize_population()
+        self.evaluation_history.append({"generation": 0, "individuals": pop})
         sortPop = self.sort.sort_population(pop, self.popsize)
+        self.generation_history.append({"generation": 0, "survivors": sortPop})
         self.save_population(sortPop, 0)
         self._summarize_gen("Gen 0", sortPop)
 
@@ -86,8 +90,14 @@ class HarmonySearchSolver:
             gen_num = gen + 1
             print(f"[HS] Gen {gen_num}: evaluating {self.popsize} individuals ...")
             newPop = self.pop.generate_new_population(sortPop)
+            self.evaluation_history.append(
+                {"generation": gen_num, "individuals": newPop}
+            )
             comPop = self.combine_population(sortPop, newPop)
             sortPop = self.sort.sort_population(comPop, self.popsize)
+            self.generation_history.append(
+                {"generation": gen_num, "survivors": sortPop}
+            )
             self.save_population(sortPop, gen_num)
             self._summarize_gen(f"Gen {gen_num}", sortPop)
 

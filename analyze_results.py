@@ -11,6 +11,7 @@
 import argparse
 import json
 import re
+import statistics
 import sys
 from pathlib import Path
 from configparser import ConfigParser
@@ -114,6 +115,86 @@ def _summarize_generation(data):
     }
 
 
+def _resolve_experiment_dir(path_arg):
+    if path_arg:
+        path = Path(path_arg)
+    else:
+        base = Path("discussion/experiment_results")
+        candidates = sorted(p for p in base.glob("20*_*") if p.is_dir())
+        if not candidates:
+            raise FileNotFoundError("no discussion/experiment_results/YYYYMMDD_* found")
+        path = candidates[-1]
+    if not path.is_dir():
+        raise FileNotFoundError(f"experiment_dir not found: {path}")
+    return path
+
+
+def load_experiment_runs(experiment_dir):
+    runs = []
+    for path in sorted(Path(experiment_dir).glob("*/run_seed_*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"WARN: skip unreadable JSON {path}: {exc}", file=sys.stderr)
+            continue
+        if isinstance(payload, dict):
+            runs.append(payload)
+    return runs
+
+
+def summarize_experiment_runs(runs):
+    grouped = {}
+    for run in runs:
+        grouped.setdefault(run["group"], []).append(run)
+
+    summary = {}
+    for group, group_runs in grouped.items():
+        best_costs = [float(run["metrics"]["best_cost"]) for run in group_runs]
+        feasible_rates = [float(run["metrics"]["feasible_rate"]) for run in group_runs]
+        wall_times = [float(run["wall_time_sec"]) for run in group_runs]
+        llm_calls = [int(run["search"]["llm_calls"]) for run in group_runs]
+        summary[group] = {
+            "runs": len(group_runs),
+            "seeds": [run["seed"] for run in group_runs],
+            "best_cost_mean": statistics.fmean(best_costs),
+            "best_cost_std": statistics.pstdev(best_costs) if len(best_costs) > 1 else 0.0,
+            "best_cost_min": min(best_costs),
+            "feasible_rate_mean": statistics.fmean(feasible_rates),
+            "wall_time_mean_sec": statistics.fmean(wall_times),
+            "llm_calls_mean": statistics.fmean(llm_calls),
+        }
+    return summary
+
+
+def _analyze_experiment_dir(experiment_dir_arg):
+    try:
+        experiment_dir = _resolve_experiment_dir(experiment_dir_arg)
+    except FileNotFoundError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    runs = load_experiment_runs(experiment_dir)
+    if not runs:
+        print(f"ERROR: no run_seed_*.json found under {experiment_dir}", file=sys.stderr)
+        return 1
+
+    summary = summarize_experiment_runs(runs)
+    print(f"experiment_dir={experiment_dir}  run_files={len(runs)}")
+    print("=" * 72)
+    for group in sorted(summary):
+        row = summary[group]
+        print(
+            f"{group:>2}  runs={row['runs']}  seeds={row['seeds']}  "
+            f"best_mean={row['best_cost_mean']:.4f}  "
+            f"best_std={row['best_cost_std']:.4f}  "
+            f"best_min={row['best_cost_min']:.4f}  "
+            f"feasible_mean={row['feasible_rate_mean']:.3f}  "
+            f"llm_calls_mean={row['llm_calls_mean']:.1f}  "
+            f"time_mean={row['wall_time_mean_sec']:.2f}s"
+        )
+    return 0
+
+
 # ─── 主函数 ──────────────────��────────────────────────────────────────────────
 
 def main():
@@ -193,5 +274,17 @@ def main():
     return 0
 
 
+def main_cli():
+    if "--experiment-dir" in sys.argv:
+        try:
+            exp_index = sys.argv.index("--experiment-dir")
+            experiment_dir = sys.argv[exp_index + 1]
+        except IndexError:
+            print("ERROR: --experiment-dir requires a path", file=sys.stderr)
+            return 1
+        return _analyze_experiment_dir(experiment_dir)
+    return main()
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main_cli())
