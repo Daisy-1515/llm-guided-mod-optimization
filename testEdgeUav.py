@@ -33,11 +33,6 @@ if __name__ == "__main__":
     gen = EdgeUavScenarioGenerator()
     scenario = gen.getScenarioInfo(params)
 
-    # 放宽 tau 确保默认参数下 BLP 可行
-    for task in scenario.tasks.values():
-        task.tau = 200.0
-        task.f_local = 1e6
-
     hs = HarmonySearchSolver(params, scenario, individual_type="edge_uav")
     hs.pop.timeout = 600  # 给 LLM 120s×3 retries 足够的 executor 等待时间
     hs.run()

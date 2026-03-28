@@ -102,7 +102,7 @@ class configPara:
 
         # UAV 硬件默认值
         self.E_max = 5000.0     # 能量预算 (J)
-        self.f_max = 5e9        # 最大 CPU 频率 (Hz)
+        self.f_max = 1e10       # 最大 CPU 频率 (Hz)
 
         # 任务生成参数
         self.D_l_min = 5e6              # 上行数据量下界 (bits)
