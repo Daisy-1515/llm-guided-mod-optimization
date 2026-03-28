@@ -202,13 +202,24 @@ class EdgeUavModPrompts(EdgeUavPrompts):
             "task_info": task_info,
             "uav_info": uav_info,
             "objective_instruction": (
-                "Please generate a **new objective function** for the Level-1 "
-                "offloading assignment problem. Your objective should creatively "
-                "balance task completion delay, edge computing energy, and assignment "
-                "quality. Consider proximity, urgency, and load distribution.\n"
-                # "【中文注释】请为 Level-1 卸载分配问题生成**新的目标函数**。"
-                # "目标应在任务完成时延、边缘计算能耗与分配质量之间进行创新性平衡。"
-                # "请考虑距离、紧迫度与负载分布。"
+                "Please generate a **completely new objective function** for the "
+                "Level-1 offloading assignment problem.\n"
+                "\n"
+                "Search mode: random-explore.\n"
+                "Your candidate must choose exactly ONE dominant design bias from "
+                "the following list:\n"
+                "- delay-first\n"
+                "- energy-first\n"
+                "- deadline-risk-aware\n"
+                "- load-balancing-aware\n"
+                "- proximity-aware\n"
+                "\n"
+                "Requirements:\n"
+                "a) Make the dominant bias explicit in obj_description.\n"
+                "b) Prefer novelty over safety, but keep the formulation solver-compatible.\n"
+                "c) Use only available precomputed constants and model variables.\n"
+                "d) Include active-task gating in every task-related summation.\n"
+                "e) Do NOT try to optimize every aspect equally - pick one main bias and make it obvious.\n"
             ),
         }
         return self._build_core_prompt(self._scenario_block, instruction)
@@ -237,16 +248,20 @@ class EdgeUavModPrompts(EdgeUavPrompts):
             "task_info": task_info,
             "uav_info": uav_info,
             "objective_instruction": (
-                "Develop an **improved objective function** based on the previous best run:\n"
-                "a) Preserve approximately 50% of the original structure.\n"
-                "b) Refine the weighting strategy - consider adjusting alpha/gamma_w balance.\n"
-                "c) Add or improve penalty terms for deadline violations or load imbalance.\n"
-                "d) Ensure all active-task gating rules are maintained.\n"
-                # "【中文注释】基于先前最佳运行，设计**改进版目标函数**：\n"
-                # "a) 保留约 50% 的原有结构。\n"
-                # "b) 优化权重策略 - 考虑调整 alpha/gamma_w 的平衡。\n"
-                # "c) 新增或改进截止期违约或负载不均衡的惩罚项。\n"
-                # "d) 确保所有活跃任务过滤规则保持不变。"
+                "Develop an **improved objective function** based on the previous best run.\n"
+                "\n"
+                "Search mode: local-refine.\n"
+                "Keep the main strategy of the previous best candidate, but improve exactly ONE weakness.\n"
+                "\n"
+                "Your refinement goals are:\n"
+                "a) Preserve the main structural idea of the previous objective.\n"
+                "b) Change only one dimension substantially: coefficient emphasis, normalization, one penalty term, "
+                "or one local-vs-offload preference rule.\n"
+                "c) Do not redesign the whole objective from scratch.\n"
+                "d) Do not add more than one new penalty component.\n"
+                "e) Avoid a near-copy output - this should look like a targeted repair, not a rewrite.\n"
+                "\n"
+                "In obj_description, explicitly state the dominant bias and the weakness you are trying to repair.\n"
             ),
         }
         return self._build_inspirational_prompt(best_ind, instruction)
@@ -275,19 +290,23 @@ class EdgeUavModPrompts(EdgeUavPrompts):
             "task_info": task_info,
             "uav_info": uav_info,
             "objective_instruction": (
-                "**Reinvent the objective function** from scratch, inspired by "
-                "the previous best run but with a fundamentally different approach:\n"
-                "a) The overall goal is to minimize weighted system cost "
-                "(delay + energy) as evaluated by the simulator.\n"
-                "b) Try a completely different cost decomposition or weighting scheme.\n"
-                "c) Consider creative strategies: QoS tiers, proximity clustering, "
-                "energy-proportional assignment, or fairness-aware allocation.\n"
-                "d) Maintain all variable naming and gating rules.\n"
-                # "【中文注释】从零开始**重构目标函数**，参考先前最佳运行但采用本质不同的方法：\n"
-                # "a) 总体目标是最小化模拟器评估的加权系统成本（时延 + 能耗）。\n"
-                # "b) 尝试完全不同的成本分解或权重方案。\n"
-                # "c) 可考虑 QoS 分层、距离聚类、能量比例分配或公平性分配等策略。\n"
-                # "d) 保持所有变量命名与活跃任务筛选规则。"
+                "**Reinvent the objective function** using a fundamentally different decomposition "
+                "from the previous best run.\n"
+                "\n"
+                "Search mode: structural-mutate.\n"
+                "The final evaluation target is still downstream system cost, but your proxy objective "
+                "must use a meaningfully new internal logic.\n"
+                "\n"
+                "Requirements:\n"
+                "a) Do NOT keep the previous decomposition style.\n"
+                "b) Change at least two of the following: dominant bias, cost decomposition, normalization strategy, "
+                "penalty structure, or local-vs-offload preference logic.\n"
+                "c) You may sacrifice some strengths of the previous best candidate if that helps explore a new direction.\n"
+                "d) Keep the formulation linear, active-task-gated, and solver-compatible.\n"
+                "\n"
+                "Acceptable new directions include deadline-priority-first, proximity clustering, "
+                "fairness-aware allocation, or conservative offloading under energy stress.\n"
+                "This candidate should feel structurally different, not cosmetically different.\n"
             ),
         }
         return self._build_inspirational_prompt(best_ind, instruction)
@@ -359,11 +378,21 @@ class EdgeUavModPrompts(EdgeUavPrompts):
             "task_info": task_info,
             "uav_info": uav_info,
             "objective_instruction": (
-                "Generate a **resource-aware objective function** that explicitly "
-                "accounts for UAV energy budgets, compute capacity, and load balance. "
-                "Follow the Resource-Aware Guidance provided above.\n"
-                # "【中文注释】生成**资源感知型目标函数**，显式考虑 UAV 能量预算、算力上限与负载均衡。"
-                # "请遵循上述资源感知指导。"
+                "Generate a **resource-aware objective function** that explicitly attacks one resource-related weakness.\n"
+                "\n"
+                "Search mode: resource-aware-specialization.\n"
+                "Your candidate must choose exactly ONE dominant resource bias from the list below:\n"
+                "- energy-budget-protection\n"
+                "- load-balancing-pressure\n"
+                "- urgent-task-nearest-UAV\n"
+                "- future-slot-reservation\n"
+                "\n"
+                "Requirements:\n"
+                "a) Follow the Resource-Aware Guidance provided above.\n"
+                "b) Make the chosen dominant bias explicit in obj_description.\n"
+                "c) Build one clearly identifiable term or penalty around that bias.\n"
+                "d) Do NOT produce a generic balanced objective.\n"
+                "e) Do NOT try to solve every resource issue at once - specialize in one direction.\n"
             ),
         }
 
@@ -381,4 +410,3 @@ class EdgeUavModPrompts(EdgeUavPrompts):
             f"{iter_text}"
             f"{instr_text}"
         )
-

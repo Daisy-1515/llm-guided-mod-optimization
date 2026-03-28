@@ -1,126 +1,105 @@
-# llm-guided-mod-optimization 项目指导
+﻿# llm-guided-mod-optimization 项目指南
 
-> **快速导航**：查看 [`文档/INDEX.md`](文档/INDEX.md) 了解完整的文档导航。
-
----
-
-## 项目概述
-
-这个项目实现了 **LLM 引导的分层优化系统**，应用于按需出行（MoD）系统，基于 NeurIPS 2025 论文。
-
-三层架构：
-1. **Layer 1 (LLM)**: 动态生成目标函数
-2. **Layer 2 (HS)**: 进化优化策略
-3. **Layer 3 (Gurobi)**: 数学约束求解
-
-详见 [`文档/架构设计.md`](文档/架构设计.md)
+> 快速导航：查看 [`文档/INDEX.md`](文档/INDEX.md) 了解完整文档结构。
 
 ---
 
-## 当前状态（自动更新）
+## 项目概览
 
-**更新时间**: 2026-03-28 15:48:04
+本项目实现 **LLM 引导的分层优化系统**，面向按需出行（MoD）和 Edge-UAV 联合优化问题。
+
+三层主架构：
+1. **Layer 1 (LLM)**：动态生成目标函数
+2. **Layer 2 (HS)**：Harmony Search 进行提示词/目标进化
+3. **Layer 3 (Optimizer)**：数学约束求解与可行性保证
+
+---
+
+## 当前状态
+
+**更新时间**: 2026-03-28
 
 ### 项目进度
-- **Phase Status**: 🟢 Phase⑦ Step4 完成 — BCD 效果验证完成，建议关闭 BCD
-- **Latest Commit**: 待提交（标准参数完整运行 + 对比分析报告）
-- **Last Verified**: ✅ BCD ON/OFF 各 10 代完整运行，100% 可行解
 
-### 最新运行结果
-- **冒烟测试** (popSize=3, iter=3): best=31.77 (均相同)
-- **标准运行 BCD ON** (popSize=5, iter=10): `discussion/20260328_134903/` → best=31.77, 成功率 80%
-- **标准运行 BCD OFF** (popSize=5, iter=10): `discussion/20260328_134908/` → best=31.77, 成功率 100%
-- **结论**: BCD 轨迹优化在当前小规模场景下**无成本改进**，反而降低稳定性（80% vs 100%）
+- **Phase Status**: Phase⑥ Step4 已完成验证，当前进入结构清理与归档阶段
+- **最新稳定提交**: `9c78066` `refactor(structure): move entry scripts out of repo root`
+- **最新文档提交**: `5cd9499` `docs(diag): move Phase4 diagnostic guide into audit docs`
+- **最近提交**: `cdbf0b8` `删除`
 
-### LLM 配置
-- **LLM Model**: `qwen3.5-plus` (config/setting.cfg:7)
-- **HS Parameters**: popSize=2, iteration=2 (冒烟); popSize=5, iteration=10 (完整)
-- **Endpoint**: CloseAI (api.openai-proxy.org)
-- **BCD Integration**: ✅ 启用 (config/setting.cfg:89-94 `use_bcd_loop=true`)
+### 当前代码结构结论
 
-## ⚡ 快速命令
+- 根目录业务 Python 入口已清理，当前根目录仅保留项目级文件和 `__init__.py`
+- 可执行入口统一迁移到 [`scripts/`](scripts)
+- 原始 MoD 共享模块迁移到 [`legacy_mod/`](legacy_mod)
+- `PHASE4_DIAGNOSTIC_GUIDE.md` 已迁移到 [`文档/40_审查与诊断/Phase4_诊断指南_2026-03-27.md`](文档/40_审查与诊断/Phase4_诊断指南_2026-03-27.md)
+
+### 最新运行/实验结论
+
+- BCD ON/OFF 在 2026-03-28 的 10 代标准参数运行中最优值一致，均为 `31.7735`
+- 小规模场景下，BCD 没带来成本收益，但稳定性低于 BCD OFF
+- 当前推荐默认阅读和运行入口以 `scripts/` 目录为准
+
+### 当前工作区状态
+
+- **未提交改动**:
+  - `LICENSE` 已删除
+  - `dependencies.yml` 已删除
+- 上述两个删除尚未提交，后续需要明确是否保留
+
+---
+
+## 快速命令
 
 ```bash
 # 环境
-uv sync                                          # 安装依赖
+uv sync
 
-# 运行（务必使用 uv run python，避免系统多版本冲突）
-uv run python scripts/testEdgeUav.py             # Edge UAV 管道
-uv run python scripts/testAll.py                 # 原始 MoD 系统
+# 主运行入口
+uv run python scripts/testEdgeUav.py
+uv run python scripts/testAll.py
 
-# 验证
-uv run python scripts/analyze_results.py --run-dir discussion/20260325_152149/
-uv run pytest tests/ -v                          # 66 测试
+# 结果分析
+uv run python scripts/analyze_results.py --run-dir discussion/<run_id>
 
-# 诊断
-uv run python scripts/check_llm_api.py           # LLM API 连接检查
+# API 诊断
+uv run python scripts/check_llm_api.py
+
+# 测试
+uv run pytest tests -v
 ```
 
-**⚠️ Python 环境说明**：
-- **务必使用 `uv run python`** 运行所有 Python 脚本，避免系统多版本 Python 冲突
-- 使用 `uv run pytest` 而非直接 `pytest`（确保正确的虚拟环境）
-- 错误示例 ❌：`python script.py`
-- 正确示例 ✅：`uv run python script.py`
+---
 
-详见 [`文档/配置指南.md`](文档/配置指南.md) 的「快速命令参考」
+## 目录职责
+
+- [`scripts/`](scripts)：可执行入口脚本
+- [`legacy_mod/`](legacy_mod)：原始 MoD 共享数据结构和场景生成
+- [`edge_uav/`](edge_uav)：Edge-UAV 主线
+- [`heuristics/`](heuristics)：Harmony Search 框架
+- [`model/`](model)：原始 MoD 优化模型
+- [`llmAPI/`](llmAPI)：LLM 接口层
+- [`文档/`](文档)：设计、诊断、运行分析、工作日记
 
 ---
 
-## 🔧 常见操作
+## 近期重要变更
 
-| 操作 | 说明 | 详见 |
-|------|------|------|
-| **切换 LLM 模型** | qwen → deepseek | 配置指南.md §配置任务1 |
-| **修改 HS 参数** | popSize, iteration | 配置指南.md §Harmony Search |
-| **调整 Edge UAV 参数** | 能耗、通信参数 | 配置指南.md §仿真参数 |
-| **分析运行结果** | 检查 S1-S4 标准 | 配置指南.md §任务4 |
+### 2026-03-28
 
----
-
-## 📚 文档导航
-
-**完整索引**: 查看 [`文档/INDEX.md`](文档/INDEX.md)
-
-**快速链接**：
-
-| 需求 | 文档 |
-|------|------|
-| 架构和设计 | [`架构设计.md`](文档/架构设计.md) |
-| 配置和操作 | [`配置指南.md`](文档/配置指南.md) |
-| 数学模型 | [`公式.md`](文档/10_模型与公式/公式.md) |
-| Phase⑥ 计划 | [`phase6-step3-socp-fix-plan.md`](plans/phase6-step3-socp-fix-plan.md) |
-| 工作日记 | [`70_工作日记/`](文档/70_工作日记/) |
-| 诊断报告 | [`40_审查与诊断/`](文档/40_审查与诊断/) |
+- 新增 [`scripts/run_all_experiments.py`](scripts/run_all_experiments.py)，用于批量实验
+- 将 `config/config.py` 中 `f_max` 默认值从 `5e9` 提高到 `1e10`
+- 移除 `testEdgeUav.py` 中运行前强制放宽 `tau` / `f_local` 的默认兜底逻辑
+- 将根目录入口和旧模块迁移到 `scripts/` 与 `legacy_mod/`
+- 将 Phase4 诊断指南迁移到审查与诊断文档目录
 
 ---
 
-## ⚠️ 重要信息
+## 下次开始建议
 
-### 依赖
-
-- **Gurobi**: 商业优化库（学术免费）
-- **Python 3.10.20**: 通过 `uv` 管理
-- **CVXPY**: 凸优化框架
-
-### 约束
-
-1. **时间槽结构**: 系统使用离散时间槽（$\delta = 1s$）
-2. **滚动时域**: 每个时间槽独立优化（可实现在线）
-3. **派生变量**: 速度由轨迹导出（$v = \Delta q / \delta$）
-4. **BCD 分解**: Edge UAV 轨迹优化使用块坐标下降法
-
-详见 [`文档/架构设计.md` 的「关键设计决策」](文档/架构设计.md)
+1. 决定是否保留 `LICENSE` 和 `dependencies.yml` 的删除
+2. 若继续清理仓库根目录剩余杂项文件，可优先处理 `.log`、`.sh`、历史临时说明
+3. 若继续实验，统一使用 `scripts/` 下入口，避免再新增根目录脚本
 
 ---
 
-## 👥 项目进展追踪
-
-**实时进度**: 查看 `MEMORY.md`（跨会话）
-**工作日记**: `文档/70_工作日记/YYYY-MM-DD.md`（由 `/endday` 自动更新）
-**运行结果**: `discussion/{run_id}/` （时间戳）
-
----
-
-**维护**: 项目级指导，结合 `/endday` skill 自动维护
-**更新**: 2026-03-25 20:30
-**架构**: 渐进式披露（快速参考 → 导航 → 详细文档）
+**维护方式**: 项目级说明文件，结合工作日记持续更新。
