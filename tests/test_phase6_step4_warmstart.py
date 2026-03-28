@@ -196,9 +196,10 @@ class TestGenerateNewHarmonyWithSnapshot:
         # 对于 Edge UAV，p 应是 dict (shrink_token_size 的结果)，way 应是字符串 (way1/way2/way3/way4)
         assert isinstance(p, dict), "p should be dict (shrunk promptHistory)"
         assert isinstance(way, str), "way should be str (way1/way2/way3/way4)"
-        # parent_snapshot 可以是 None 或 dict
-        assert parent_snapshot is None or isinstance(parent_snapshot, dict), \
-            "parent_snapshot should be None or dict"
+        # parent_snapshot 可以是 None、dict 或 Level2Snapshot
+        from edge_uav.model.precompute import Level2Snapshot
+        assert parent_snapshot is None or isinstance(parent_snapshot, (dict, Level2Snapshot)), \
+            "parent_snapshot should be None, dict, or Level2Snapshot"
 
     def test_condition_t_equals_0_is_integer_comparison(self, hs_bundle_with_bcd):
         """验证修复: 条件应是 t == 0 (整数比较) 而非 't' == 0 (字符串比较)"""

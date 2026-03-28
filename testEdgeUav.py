@@ -17,9 +17,7 @@ if __name__ == "__main__":
     params = configPara(None, None)
     params.getConfigInfo()
 
-    # 试跑参数覆盖（默认值 → 环境变量覆盖）
-    params.popSize = 3
-    params.iteration = 3
+    # 标准参数覆盖（默认值来自 config.setting.cfg，可被环境变量覆盖）
     params.popSize = int(os.environ.get("HS_POP_SIZE", params.popSize))
     params.iteration = int(os.environ.get("HS_ITERATION", params.iteration))
 
