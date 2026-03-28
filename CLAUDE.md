@@ -24,7 +24,7 @@
 - **Phase Status**: Phase⑥ Step4 已完成验证，当前进入结构清理与归档阶段
 - **最新稳定提交**: `9c78066` `refactor(structure): move entry scripts out of repo root`
 - **最新文档提交**: `5cd9499` `docs(diag): move Phase4 diagnostic guide into audit docs`
-- **最近提交**: `cdbf0b8` `删除`
+- **最近提交**: `3bafa76` `docs: end-of-day routine (2026-03-29)`
 
 ### 当前代码结构结论
 
@@ -41,10 +41,9 @@
 
 ### 当前工作区状态
 
-- **未提交改动**:
-  - `LICENSE` 已删除
-  - `dependencies.yml` 已删除
-- 上述两个删除尚未提交，后续需要明确是否保留
+- 当前应以文档同步和结构清理为主，不应长期保留未提交改动
+- 若 `endday` 运行后仍残留文档改动，优先检查 `.endday.env` 的 `STAGE_PATTERNS` 是否覆盖 `文档/配置指南.md` 和 `文档/60_规划草案/`
+- 当前推荐在收尾前用 `git status --short` 再核对一次暂存范围
 
 ---
 
@@ -96,8 +95,8 @@ uv run pytest tests -v
 
 ## 下次开始建议
 
-1. 决定是否保留 `LICENSE` 和 `dependencies.yml` 的删除
-2. 若继续清理仓库根目录剩余杂项文件，可优先处理 `.log`、`.sh`、历史临时说明
+1. 若继续使用 `endday`，优先验证文档类改动是否都能被自动纳入暂存
+2. 若要彻底消除 Windows 下的乱码尾错，单独修复 `endday` skill 的 subprocess 编码处理
 3. 若继续实验，统一使用 `scripts/` 下入口，避免再新增根目录脚本
 
 ---

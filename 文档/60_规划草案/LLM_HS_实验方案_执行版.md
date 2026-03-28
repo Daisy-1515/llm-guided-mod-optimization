@@ -1,4 +1,4 @@
-﻿# LLM-Guided Edge UAV 实验方案（执行版）
+# LLM-Guided Edge UAV 实验方案（执行版）
 
 **创建日期**: 2026-03-28  
 **项目**: `llm-guided-mod-optimization`  
@@ -8,7 +8,7 @@
 
 ## 1. 研究问题
 
-本轮实验只研究 **Level-1 目标函数设计与搜索策略**，默认关闭 `use_bcd_loop`，避免 Level-2 资源分配/轨迹优化混入主结论。
+本轮实验只研究 **Level-1 目标函数设计与搜索策略**。对批量实验入口 `scripts/run_all_experiments.py` 而言，默认关闭 `use_bcd_loop`，避免 Level-2 资源分配/轨迹优化混入主结论；注意这不等同于全仓配置文件的全局默认值。
 
 需要回答的假设：
 
@@ -52,7 +52,7 @@
 | `numUAVs` | 5 |
 | `T` | 20 |
 | `scenario_seed` | 多 seed，默认 `42 43 44` |
-| `use_bcd_loop` | `false` |
+| `use_bcd_loop` | `false`（仅 `run_all_experiments.py` 默认值） |
 
 ### 3.2 规模敏感性
 
@@ -118,6 +118,8 @@
 uv run python scripts/run_all_experiments.py
 ```
 
+未传 `--use-bcd-loop` 时，该脚本会显式使用 `False`，而不是继承 `config/setting.cfg` 的当前值。
+
 ### 5.2 指定组别和 seed
 
 ```bash
@@ -142,6 +144,8 @@ uv run python scripts/run_all_experiments.py --dry-run
 uv run python scripts/analyze_results.py --experiment-dir discussion/experiment_results/<timestamp>
 ```
 
+说明：当前脚本入口已支持 `--experiment-dir`，但 `--help` 还没有显示这个参数。
+
 ---
 
 ## 6. 输出目录
@@ -159,6 +163,8 @@ discussion/experiment_results/<timestamp>/
 ├── D1/
 └── D2/
 ```
+
+单次 HS 运行的原始输出仍位于 `discussion/<timestamp>/`，与这里的批量实验目录是两套结构。
 
 ---
 
