@@ -129,6 +129,9 @@ class BCDResult:
     converged: bool
     cost_history: List[float]
     solution_details: Dict[str, Any] = field(default_factory=dict)
+    offloading_error_message: str = ""
+    used_default_obj: bool = True
+    objective_acceptance_status: str = "default_obj"
 
 
 # =====================================================================
@@ -476,6 +479,9 @@ def run_bcd_loop(
         "total_rollbacks": 0,
         "final_sca_iterations": 0,
     }
+    offloading_error_message = "None Obj. Using default obj."
+    used_default_obj = dynamic_obj_func is None
+    objective_acceptance_status = "default_obj" if dynamic_obj_func is None else "unknown"
 
     # -------- BCD outer loop --------
     for k in range(max_bcd_iter):
@@ -514,6 +520,17 @@ def run_bcd_loop(
             offloading_outputs = validate_offloading_outputs(
                 offloading_model.getOutputs(), scenario
             )
+            offloading_error_message = offloading_model.error_message or ""
+            used_default_obj = (
+                offloading_error_message
+                != "Your obj function is correct. Gurobi accepts your obj."
+            )
+            if offloading_error_message == "Your obj function is correct. Gurobi accepts your obj.":
+                objective_acceptance_status = "accepted_custom_obj"
+            elif dynamic_obj_func is None:
+                objective_acceptance_status = "default_obj"
+            else:
+                objective_acceptance_status = "fallback_default_obj"
             logger.info(f"Level 1 offloading solved (gap={offloading_model.gap:.4%})")
         except Exception as e:
             logger.error(f"Level 1 offloading failed at iteration {k}: {e}")
@@ -669,4 +686,7 @@ def run_bcd_loop(
         converged=(len(cost_history) < max_bcd_iter + 1),
         cost_history=cost_history,
         solution_details=solution_details,
+        offloading_error_message=offloading_error_message,
+        used_default_obj=used_default_obj,
+        objective_acceptance_status=objective_acceptance_status,
     )

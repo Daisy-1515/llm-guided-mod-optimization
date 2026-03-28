@@ -16,7 +16,9 @@ pytest.importorskip("gurobipy")
 
 from config.config import configPara
 from edge_uav.model.evaluator import INVALID_OUTPUT_PENALTY
+from edge_uav.model.precompute import make_initial_level2_snapshot
 from edge_uav.scenario_generator import EdgeUavScenarioGenerator
+from edge_uav.model.bcd_loop import BCDResult
 from heuristics.hsIndividualEdgeUav import hsIndividualEdgeUav
 from heuristics.hsPopulation import hsPopulation
 
@@ -114,3 +116,129 @@ def test_t3_format_scenario_info(scenario_bundle):
     assert "active_slots" in task_info
     assert "UAV" in uav_info
     assert "E_max" in uav_info
+
+
+def test_t4_bcd_recomputes_precompute_for_scoring(scenario_bundle, monkeypatch):
+    """BCD 路径评分应基于最终 snapshot 的重计算结果，而不是初始化 precompute。"""
+    config, scenario = scenario_bundle
+    config.use_bcd_loop = True
+
+    ind = hsIndividualEdgeUav(config, scenario)
+    initial_precompute = ind.precompute_result
+    final_precompute = type(
+        "FakePrecompute",
+        (),
+        {"diagnostics": {"offload_feasible_ratio": 0.5}},
+    )()
+
+    def fake_run_bcd_loop(**kwargs):
+        outputs = {t: {"local": [], "offload": {j: [] for j in scenario.uavs}} for t in scenario.time_slots}
+        return BCDResult(
+            snapshot=make_initial_level2_snapshot(scenario),
+            offloading_outputs=outputs,
+            total_cost=12.34,
+            bcd_iterations=2,
+            converged=True,
+            cost_history=[12.34, 12.34],
+            solution_details={},
+        )
+
+    def fake_precompute_offloading_inputs(*args, **kwargs):
+        return final_precompute
+
+    captured = {}
+
+    def fake_evaluate_solution(outputs, precompute_result, scenario_arg):
+        captured["precompute_result"] = precompute_result
+        assert scenario_arg is scenario
+        return 7.89
+
+    monkeypatch.setattr("heuristics.hsIndividualEdgeUav.run_bcd_loop", fake_run_bcd_loop)
+    monkeypatch.setattr(
+        "heuristics.hsIndividualEdgeUav.precompute_offloading_inputs",
+        fake_precompute_offloading_inputs,
+    )
+    monkeypatch.setattr(
+        "heuristics.hsIndividualEdgeUav.evaluate_solution",
+        fake_evaluate_solution,
+    )
+
+    ind.runOptModel("", "default")
+
+    assert captured["precompute_result"] is not initial_precompute
+    assert ind.promptHistory["evaluation_score"] == pytest.approx(7.89)
+    step = ind.promptHistory["simulation_steps"]["0"]
+    assert step["final_precompute_diagnostics"]["offload_feasible_ratio"] == 0.5
+
+
+def test_t5_bcd_logs_solver_status_consistently(scenario_bundle, monkeypatch):
+    """BCD 成功路径应使用 BCDResult 携带的 solver 状态，而不是伪造默认目标日志。"""
+    config, scenario = scenario_bundle
+    config.use_bcd_loop = True
+
+    ind = hsIndividualEdgeUav(config, scenario)
+
+    def fake_run_bcd_loop(**kwargs):
+        outputs = {
+            t: {"local": [], "offload": {j: [] for j in scenario.uavs}}
+            for t in scenario.time_slots
+        }
+        return BCDResult(
+            snapshot=make_initial_level2_snapshot(scenario),
+            offloading_outputs=outputs,
+            total_cost=12.34,
+            bcd_iterations=2,
+            converged=True,
+            cost_history=[12.34, 12.34],
+            solution_details={},
+            offloading_error_message="Your obj function is correct. Gurobi accepts your obj.",
+            used_default_obj=False,
+            objective_acceptance_status="accepted_custom_obj",
+        )
+
+    fake_precompute = type(
+        "FakePrecompute",
+        (),
+        {"diagnostics": {"offload_feasible_ratio": 0.5}},
+    )()
+
+    monkeypatch.setattr("heuristics.hsIndividualEdgeUav.run_bcd_loop", fake_run_bcd_loop)
+    monkeypatch.setattr(
+        ind,
+        "getNewPrompt",
+        lambda parent, way: (
+            '{"obj_code": "def dynamic_obj_func(self):\\n    return None"}',
+            {
+                "task_info": "task",
+                "uav_info": "uav",
+                "llm_response": '{"obj_code": "def dynamic_obj_func(self):\\n    return None"}',
+                "raw_llm_response": '{"obj_code": "def dynamic_obj_func(self):\\n    return None"}',
+                "response_format": "",
+                "feasible": False,
+                "solver_cost": float(INVALID_OUTPUT_PENALTY),
+                "used_default_obj": False,
+                "llm_status": "ok",
+                "llm_error": None,
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        "heuristics.hsIndividualEdgeUav.precompute_offloading_inputs",
+        lambda *args, **kwargs: fake_precompute,
+    )
+    monkeypatch.setattr(
+        "heuristics.hsIndividualEdgeUav.evaluate_solution",
+        lambda *args, **kwargs: 7.89,
+    )
+    monkeypatch.setattr(
+        "heuristics.hsIndividualEdgeUav.extract_code_hsIndiv",
+        lambda response: "def dynamic_obj_func(self):\n    return None",
+    )
+
+    ind.runOptModel("", "way1")
+
+    step = ind.promptHistory["simulation_steps"]["0"]
+    assert step["llm_status"] == "ok"
+    assert step["used_default_obj"] is False
+    assert step["response_format"] == "Your obj function is correct. Gurobi accepts your obj."
+    assert step["bcd_meta"]["objective_acceptance_status"] == "accepted_custom_obj"

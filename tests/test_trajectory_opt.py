@@ -338,6 +338,35 @@ def test_sca_reports_convergence_metadata(
     # Check diagnostics
     assert len(result.diagnostics["true_objective_history"]) == result.sca_iterations
     assert len(result.diagnostics["sca_times"]) == result.sca_iterations
+
+
+def test_project_scale_params_do_not_go_unbounded(base_scenario_1uav, params, linear_init_trajectory_1uav):
+    """Project-scale trajectory params should remain bounded in the SOCP subproblem."""
+    scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+
+    project_traj_params = TrajectoryOptParams(
+        eta_1=79.86,
+        eta_2=88.63,
+        eta_3=0.0151,
+        eta_4=0.0048,
+        v_tip=120.0,
+        v_max=15.0,
+        d_safe=5.0,
+    )
+
+    result = solve_trajectory_sca(
+        scenario,
+        {},
+        {},
+        q_init,
+        params,
+        project_traj_params,
+        max_sca_iter=5,
+    )
+
+    assert result.solver_status in {"optimal", "optimal_inaccurate"}
+    assert math.isfinite(result.objective_value)
     assert all(t >= 0 for t in result.diagnostics["sca_times"])
 
     # Objective should be positive

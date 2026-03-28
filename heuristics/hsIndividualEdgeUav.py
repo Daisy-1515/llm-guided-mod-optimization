@@ -252,6 +252,9 @@ class hsIndividualEdgeUav:
             "bcd_cost_history": list(bcd_result.cost_history),
             "solution_details": dict(bcd_result.solution_details) if bcd_result.solution_details else {},
             "optimal_snapshot": bcd_result.snapshot,  # Phase⑥ Step4 Day 2: 热启动快照
+            "offloading_error_message": bcd_result.offloading_error_message,
+            "used_default_obj": bool(bcd_result.used_default_obj),
+            "objective_acceptance_status": bcd_result.objective_acceptance_status,
         }
 
         return feasible, cost, full_info_bcd_meta
@@ -414,12 +417,31 @@ class hsIndividualEdgeUav:
                 feasible, cost, bcd_meta = self._adapt_bcd_result_to_legacy(
                     bcd_result, bcd_result.offloading_outputs, self.precompute_result
                 )
+                # Recompute precompute tensors on the final BCD snapshot before
+                # scoring. Otherwise evaluation_score stays tied to the
+                # initialization snapshot and hides any BCD effect.
+                final_precompute_result = precompute_offloading_inputs(
+                    self.scenario,
+                    params,
+                    bcd_result.snapshot,
+                    mu=None,
+                    active_only=True,
+                )
                 # 重新评分（使用 BCD 最优快照）
                 score = evaluate_solution(
-                    bcd_result.offloading_outputs, self.precompute_result, self.scenario,
+                    bcd_result.offloading_outputs,
+                    final_precompute_result,
+                    self.scenario,
                 )
                 full_info["bcd_enabled"] = True
                 full_info["bcd_meta"] = bcd_meta
+                full_info["final_precompute_diagnostics"] = (
+                    final_precompute_result.diagnostics
+                )
+                full_info["response_format"] = (
+                    bcd_result.offloading_error_message or "BCD objective status unavailable"
+                )
+                full_info["used_default_obj"] = bool(bcd_result.used_default_obj)
 
             except Exception as bcd_exc:
                 # BCD 失败：降级至 Level 1（保留异常记录）
@@ -481,6 +503,10 @@ class hsIndividualEdgeUav:
             if bcd_enabled and not bcd_meta:
                 # BCD 启用但已降级，show 原始错误信息
                 full_info["response_format"] = "BCD fallback to Level 1"
+            elif bcd_enabled and bcd_meta:
+                # BCD 成功路径已经从 BCDResult 注入了真实的目标采用状态，
+                # 这里不要再用不存在的本地 Level-1 model 覆盖掉它。
+                pass
             else:
                 # 原始 Level 1 响应格式
                 full_info["response_format"] = (

@@ -518,6 +518,10 @@ def _build_sca_subproblem(
             constraints.append(norm_sq <= (delta ** 2) * speed_sq[j][t])
             # speed_sq[j][t] >= 0
             constraints.append(speed_sq[j][t] >= 0)
+            # Keep the epigraph variable physically bounded as v^2 <= v_max^2.
+            # Without this upper bound, the secant-based propulsion surrogate
+            # can become numerically unbounded for some parameter regimes.
+            constraints.append(speed_sq[j][t] <= traj_params.v_max ** 2)
 
     # Propulsion energy objective (from speed_sq)
     for j in uavs:
