@@ -1,4 +1,4 @@
-# LLM-Guided Edge UAV 实验方案（执行版）
+﻿# LLM-Guided Edge UAV 实验方案（执行版）
 
 **创建日期**: 2026-03-28  
 **项目**: `llm-guided-mod-optimization`  
@@ -139,7 +139,7 @@ uv run python scripts/run_all_experiments.py --dry-run
 ### 5.5 结果汇总
 
 ```bash
-uv run python analyze_results.py --experiment-dir discussion/experiment_results/<timestamp>
+uv run python scripts/analyze_results.py --experiment-dir discussion/experiment_results/<timestamp>
 ```
 
 ---
@@ -185,3 +185,4 @@ discussion/experiment_results/<timestamp>/
 - 若数据支持 H1/H2/H3/H4，则报告支持程度和幅度
 - 若数据不支持，则报告负结果并分析原因
 - 不用单一 seed 或单次最好结果替代总体结论
+

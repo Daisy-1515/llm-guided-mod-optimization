@@ -1,9 +1,9 @@
 """Phase⑤ 首跑结果分析 — S1-S4 成功判据检测。
 
 用法:
-    .venv/Scripts/python analyze_results.py
-    .venv/Scripts/python analyze_results.py --run-dir discussion/20260320_143012
-    .venv/Scripts/python analyze_results.py --expected-pop-size 3 --expected-iterations 3
+    .venv/Scripts/python scripts/analyze_results.py
+    .venv/Scripts/python scripts/analyze_results.py --run-dir discussion/20260320_143012
+    .venv/Scripts/python scripts/analyze_results.py --expected-pop-size 3 --expected-iterations 3
 
 如果不指定 --expected-iterations，脚本会尝试从 config/setting.cfg 读取。
 """
@@ -15,6 +15,10 @@ import statistics
 import sys
 from pathlib import Path
 from configparser import ConfigParser
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 GEN_FILE_RE = re.compile(r"population_result_(\d+)\.json$")

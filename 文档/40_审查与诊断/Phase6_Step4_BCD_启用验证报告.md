@@ -1,4 +1,4 @@
-# Phase⑥ Step4 Day 2: BCD 循环集成启用验证报告
+﻿# Phase⑥ Step4 Day 2: BCD 循环集成启用验证报告
 
 **日期**: 2026-03-27
 **计划编号**: warm-humming-phoenix
@@ -76,7 +76,7 @@ bcd_max_rollbacks: 2
 ### 2. 基线冒烟测试（Step 4）
 
 **配置**: `use_bcd_loop = false`
-**命令**: `HS_POP_SIZE=2 HS_ITERATION=2 uv run python testEdgeUav.py`
+**命令**: `HS_POP_SIZE=2 HS_ITERATION=2 uv run python scripts/testEdgeUav.py`
 
 **结果**: ✅ 通过
 
@@ -96,7 +96,7 @@ bcd_max_rollbacks: 2
 ### 3. BCD 启用冒烟测试（Step 5）
 
 **配置**: `use_bcd_loop = true`
-**命令**: `HS_POP_SIZE=2 HS_ITERATION=2 uv run python testEdgeUav.py`
+**命令**: `HS_POP_SIZE=2 HS_ITERATION=2 uv run python scripts/testEdgeUav.py`
 
 **结果**: ✅ 通过（有降级）
 
@@ -296,3 +296,4 @@ bcd_max_rollbacks: 2
 **报告作者**: Claude (Opus 4.6)
 **验证状态（历史快照）**: ✅ 当时完成配置启用验证，并记录了
 “BCD 算法待修复”的阶段性状态
+

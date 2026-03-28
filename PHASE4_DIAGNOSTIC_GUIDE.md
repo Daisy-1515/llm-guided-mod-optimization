@@ -1,4 +1,4 @@
-# Phase⑥ Step4 诊断指南
+﻿# Phase⑥ Step4 诊断指南
 
 **制定日期**: 2026-03-27
 **计划编号**: binary-squishing-hare
@@ -128,7 +128,7 @@ grep -E "eps_bcd|max_bcd_iter" config/config.py
 - **方案 B**：增加迭代次数 `MAX_BCD_ITER = 5`（从 2）
   ```bash
   export MAX_BCD_ITER=5
-  uv run python testEdgeUav.py
+  uv run python scripts/testEdgeUav.py
   ```
 
 - **方案 C**：检查成本是否实际在变化（若无变化，问题可能不在 BCD）
@@ -200,7 +200,7 @@ curl -s "https://api.openai-proxy.org/v1/models" | head -c 100
 - **方案 A**：增加超时时间 `timeout 300`（从 180）
   ```bash
   export HS_POP_SIZE=1 HS_ITERATION=1 MAX_BCD_ITER=2
-  timeout 300 uv run python testEdgeUav.py
+  timeout 300 uv run python scripts/testEdgeUav.py
   ```
 
 - **方案 B**：减少 HS 参数以加快执行
@@ -239,11 +239,11 @@ uv run python -m pytest tests/ -q --tb=no
 ```bash
 # 单个体
 export HS_POP_SIZE=1 HS_ITERATION=1 MAX_BCD_ITER=2
-timeout 180 uv run python testEdgeUav.py
+timeout 180 uv run python scripts/testEdgeUav.py
 
 # 多个体
 export HS_POP_SIZE=2 HS_ITERATION=2 MAX_BCD_ITER=2
-timeout 300 uv run python testEdgeUav.py
+timeout 300 uv run python scripts/testEdgeUav.py
 ```
 
 ### 诊断和日志
@@ -350,3 +350,4 @@ gen1_individual.initialize_with_snapshot(best_snapshot)
 **制定者**: Claude Code + Codex MCP
 **审核**: Phase⑥ Step4 Binary Squishing Hare Plan
 **最后更新**: 2026-03-27 11:37
+

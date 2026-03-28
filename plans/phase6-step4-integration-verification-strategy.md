@@ -1,4 +1,4 @@
-# Phase⑥ Step4 集成验证策略
+﻿# Phase⑥ Step4 集成验证策略
 ## Day 1 准备文档
 
 **日期**: 2026-03-26
@@ -302,7 +302,7 @@ export SOLVER_TIMEOUT=60    # 单个求解器超时：60 sec
 cd /e/aaa_dev/llm-guided-mod-optimization
 
 # 烟雾测试：运行单代 HS 管道
-uv run python testEdgeUav.py \
+uv run python scripts/testEdgeUav.py \
     --popsize=1 \
     --iteration=1 \
     --run-dir discussion/smoke_test_phase6_step4/ \
@@ -687,3 +687,4 @@ score = evaluate_solution(bcd_result, ...)
 **状态**: 🗂️ 历史验收策略文档（规划阶段已完成，正文保留当时执行前状态）
 **后续状态**: 该策略文档之后的实现推进请以 `CLAUDE.md` 和
 `文档/70_工作日记/2026-03-27.md` 为准
+

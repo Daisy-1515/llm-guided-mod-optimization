@@ -94,15 +94,15 @@ class ProjectClaudeUpdater:
 
 ```bash
 uv sync                      # 环境设置
-python testEdgeUav.py        # 运行 Edge UAV 管道
-python analyze_results.py    # 验证结果
+python scripts/testEdgeUav.py        # 运行 Edge UAV 管道
+python scripts/analyze_results.py    # 验证结果
 pytest tests/ -v             # 运行全部测试
 ```
 
 ## 文件地图
 
 **原始 MoD 系统**:
-- `scenarioGenerator.py` — 场景生成
+- `legacy_mod/scenarioGenerator.py` — 场景生成
 - `AssignmentModel.py`, `SequencingModel.py` — 优化模型
 - `SimClass.py` — 仿真评估
 
@@ -135,8 +135,8 @@ iteration = 10
 
 ### 运行完整管道
 ```bash
-python testEdgeUav.py --popsize=5 --iteration=10
-python analyze_results.py --run-dir discussion/LATEST_RUN/
+python scripts/testEdgeUav.py --popsize=5 --iteration=10
+python scripts/analyze_results.py --run-dir discussion/LATEST_RUN/
 ```
 
 ## 详细文档
@@ -245,7 +245,7 @@ python analyze_results.py --run-dir discussion/LATEST_RUN/
             json_files = list(latest.glob("population_result_*.json"))
             if json_files:
                 gen_count = len(json_files)
-                return f"- **Latest Run**: `{run_name}/` ({gen_count} generations)\n- **Status**: Check with `python analyze_results.py --run-dir {latest.name}/`"
+                return f"- **Latest Run**: `{run_name}/` ({gen_count} generations)\n- **Status**: Check with `python scripts/analyze_results.py --run-dir {latest.name}/`"
             else:
                 return f"- **Latest Run**: `{run_name}/` (in progress)"
 

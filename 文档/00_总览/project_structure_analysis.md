@@ -1,4 +1,4 @@
-# Project Structure Analysis Report
+﻿# Project Structure Analysis Report
 
 ## Project Overview
 
@@ -295,7 +295,7 @@ Called by `testAll.py` to create scenarios based on config parameters before run
 
 **Simple Interface:**
 ```bash
-python testAll.py
+python scripts/testAll.py
 ```
 All configuration is externalized, making it easy to run different experiments.
 
@@ -590,7 +590,7 @@ conda activate llm-guided-mod-optimization
 # Follow: https://www.gurobi.com/academia/
 
 # 4. Run optimization
-python testAll.py
+python scripts/testAll.py
 ```
 
 **Expected Runtime:**
@@ -725,4 +725,5 @@ testAll.py
 
 **Report Generated:** 2026-03-08
 **Analysis Scope:** Complete project structure, architecture, and implementation details
+
 

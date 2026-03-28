@@ -15,7 +15,7 @@
 import itertools
 import gurobipy as gb
 from model.milpModel import generalModel
-from dataCommon import Task
+from legacy_mod.dataCommon import Task
 
 class sequencingModel(generalModel):
     """

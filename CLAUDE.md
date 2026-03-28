@@ -45,15 +45,15 @@
 uv sync                                          # 安装依赖
 
 # 运行（务必使用 uv run python，避免系统多版本冲突）
-uv run python testEdgeUav.py                     # Edge UAV 管道
-uv run python testAll.py                         # 原始 MoD 系统
+uv run python scripts/testEdgeUav.py             # Edge UAV 管道
+uv run python scripts/testAll.py                 # 原始 MoD 系统
 
 # 验证
-uv run python analyze_results.py --run-dir discussion/20260325_152149/
+uv run python scripts/analyze_results.py --run-dir discussion/20260325_152149/
 uv run pytest tests/ -v                          # 66 测试
 
 # 诊断
-uv run python check_llm_api.py                   # LLM API 连接检查
+uv run python scripts/check_llm_api.py           # LLM API 连接检查
 ```
 
 **⚠️ Python 环境说明**：

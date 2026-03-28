@@ -1,4 +1,4 @@
-# 完整 Pipeline 首次试跑 — 详细计划
+﻿# 完整 Pipeline 首次试跑 — 详细计划
 
 > 生成日期：2026-03-19
 > 状态：历史试跑计划（该“待执行”状态仅对应 2026-03-19）
@@ -116,7 +116,7 @@ print("RAW:", resp[:500])
 ### D2：单个体完整生命周期（way1）
 ```bash
 # testEdgeUav.py 临时改 popSize=1, iteration=1
-.venv/Scripts/python testEdgeUav.py
+.venv/Scripts/python scripts/testEdgeUav.py
 # 检查 discussion/{run_id}/population_result_0.json
 # 验证: llm_status, used_default_obj, feasible, evaluation_score
 ```
@@ -138,14 +138,14 @@ print("RAW:", resp[:500])
 ### E1：1×1 最小烟雾测试
 ```bash
 # popSize=1, iteration=1
-.venv/Scripts/python testEdgeUav.py 2>&1 | tee logs/run_1x1.log
+.venv/Scripts/python scripts/testEdgeUav.py 2>&1 | tee logs/run_1x1.log
 ```
 
 ### E2：3×3 正式首跑
 ```bash
 # popSize=3, iteration=3（testEdgeUav.py 默认值）
 mkdir -p logs
-.venv/Scripts/python testEdgeUav.py 2>&1 | tee logs/run_3x3_$(date +%Y%m%d_%H%M%S).log
+.venv/Scripts/python scripts/testEdgeUav.py 2>&1 | tee logs/run_3x3_$(date +%Y%m%d_%H%M%S).log
 ```
 **预期耗时**：3-10 分钟（并发 3，每个体 LLM ~5-15s + Gurobi ~2-10s）。
 
@@ -244,3 +244,4 @@ A（提交加固）
 | `config/setting.cfg` + `config/env/.env` | LLM endpoint/key 配置 |
 | `discussion/{run_id}/` | 首跑结果输出目录（B1 新建）|
 | `analyze_results.py` | 首跑后统计分析脚本（阶段 F）|
+

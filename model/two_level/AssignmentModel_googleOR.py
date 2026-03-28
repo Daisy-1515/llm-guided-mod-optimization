@@ -2,7 +2,7 @@ from ortools.linear_solver import pywraplp
 from ortools.sat.python import cp_model
 from dataclasses import dataclass
 from model.milpModel import generalModel
-from dataCommon import Task, Taxi, Passenger
+from legacy_mod.dataCommon import Task, Taxi, Passenger
 
 class assignmentModel(generalModel):
     def __init__(self, DistMatrix, wpList, taxiList, dynamic_obj_func=None):

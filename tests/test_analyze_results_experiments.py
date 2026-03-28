@@ -1,6 +1,6 @@
 import json
 
-from analyze_results import load_experiment_runs, summarize_experiment_runs
+from scripts.analyze_results import load_experiment_runs, summarize_experiment_runs
 
 
 def test_summarize_experiment_runs(tmp_path):

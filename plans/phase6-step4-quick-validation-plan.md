@@ -1,4 +1,4 @@
-# Phase⑥ Step4 方案A 最终实施计划
+﻿# Phase⑥ Step4 方案A 最终实施计划
 
 **状态**：🗂️ 历史实施计划（撰写时为 Phase 3 阅读验证中，后续已执行）
 **更新**：2026-03-27
@@ -152,7 +152,7 @@ cd /Users/daisy/Desktop/llm-guided-mod-optimization
 export HS_POP_SIZE=1
 export HS_ITERATION=1
 export MAX_BCD_ITER=2
-uv run python testEdgeUav.py
+uv run python scripts/testEdgeUav.py
 
 # 预期耗时：< 3 minutes
 ```
@@ -189,7 +189,7 @@ echo "✓ Unit tests: $pytest_pass"
 # 检查 2：冒烟输出包含关键字
 smoke_log=$(mktemp)
 cd /Users/daisy/Desktop/llm-guided-mod-optimization
-HS_POP_SIZE=1 HS_ITERATION=1 uv run python testEdgeUav.py > "$smoke_log" 2>&1
+HS_POP_SIZE=1 HS_ITERATION=1 uv run python scripts/testEdgeUav.py > "$smoke_log" 2>&1
 
 echo "✓ Smoke test output:"
 grep -E "(BCD Iteration|Converged|Cost =|Feasible)" "$smoke_log"
@@ -260,3 +260,4 @@ ls -d discussion/2026* 2>/dev/null | tail -1
 **计划创建日期**：2026-03-27
 **目标执行日期**：2026-03-27 或 2026-03-28
 **状态**：🗂️ 历史实施计划（该“待执行”状态仅对应计划撰写时）
+

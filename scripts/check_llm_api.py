@@ -4,13 +4,18 @@
 发一条极短 prompt 验证端到端连通。
 
 用法:
-    .venv/Scripts/python check_llm_api.py
+    .venv/Scripts/python scripts/check_llm_api.py
 退出码: 0 成功, 1 失败
 """
 
 import sys
 import time
+from pathlib import Path
 from urllib.parse import urlparse
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from config.config import configPara
 from llmAPI.llmInterface import InterfaceAPI

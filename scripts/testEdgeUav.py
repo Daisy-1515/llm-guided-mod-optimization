@@ -1,27 +1,32 @@
-"""Edge UAV 入口脚本 — 与 testAll.py 平行。
+﻿"""Edge UAV entry script, parallel to testAll.py.
 
-用法:
-    .venv/Scripts/python testEdgeUav.py
+Usage:
+    .venv/Scripts/python scripts/testEdgeUav.py
 
-环境变量覆盖（用于 D2/D3 阶梯预飞）:
-    HS_POP_SIZE=1 HS_ITERATION=1 .venv/Scripts/python testEdgeUav.py
+Environment variable override:
+    HS_POP_SIZE=1 HS_ITERATION=1 .venv/Scripts/python scripts/testEdgeUav.py
 """
 
 import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from config.config import configPara
 from edge_uav.scenario_generator import EdgeUavScenarioGenerator
 from heuristics.hsFrame import HarmonySearchSolver
 
-if __name__ == "__main__":
+
+def main():
     params = configPara(None, None)
     params.getConfigInfo()
 
-    # 标准参数覆盖（默认值来自 config.setting.cfg，可被环境变量覆盖）
     params.popSize = int(os.environ.get("HS_POP_SIZE", params.popSize))
     params.iteration = int(os.environ.get("HS_ITERATION", params.iteration))
 
-    # 启动前诊断
     print(f"[testEdgeUav] model={params.llmModel}, endpoint={params.api_endpoint}")
     print(f"[testEdgeUav] popSize={params.popSize}, iteration={params.iteration}")
 
@@ -34,5 +39,9 @@ if __name__ == "__main__":
     scenario = gen.getScenarioInfo(params)
 
     hs = HarmonySearchSolver(params, scenario, individual_type="edge_uav")
-    hs.pop.timeout = 600  # 给 LLM 120s×3 retries 足够的 executor 等待时间
+    hs.pop.timeout = 600
     hs.run()
+
+
+if __name__ == "__main__":
+    main()

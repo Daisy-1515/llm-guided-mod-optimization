@@ -60,7 +60,7 @@ echo ""
 echo "[6] Smoke test execution (HS_POP_SIZE=1, ITERATION=1)"
 SMOKE_LOG=$(mktemp)
 export HS_POP_SIZE=1 HS_ITERATION=1 MAX_BCD_ITER=2
-timeout 180 uv run python testEdgeUav.py > "$SMOKE_LOG" 2>&1
+timeout 180 uv run python scripts/testEdgeUav.py > "$SMOKE_LOG" 2>&1
 EXIT_CODE=$?
 if [ $EXIT_CODE -eq 0 ]; then
     echo "  PASS - Exit code 0 (successful execution)"

@@ -1,4 +1,4 @@
-# Phase⑥ Step3：DCP 约束非凸性问题修复计划
+﻿# Phase⑥ Step3：DCP 约束非凸性问题修复计划
 
 **日期**：2026-03-25
 **版本**：1.0（最终版）
@@ -534,8 +534,8 @@ pytest tests/test_evaluator.py tests/test_hs_individual_edge_uav.py -v
 
 **命令**：
 ```bash
-python testEdgeUav.py --popsize=3 --iteration=3 --run-dir discussion/phase6_step3_test/
-python analyze_results.py --run-dir discussion/phase6_step3_test/
+python scripts/testEdgeUav.py --popsize=3 --iteration=3 --run-dir discussion/phase6_step3_test/
+python scripts/analyze_results.py --run-dir discussion/phase6_step3_test/
 ```
 
 **验证项**：
@@ -634,3 +634,4 @@ python analyze_results.py --run-dir discussion/phase6_step3_test/
 **最后更新**：2026-03-25 12:30
 **状态**：✅ Ready for execution
 **优先级**：🔴 Blocking Phase④ milestone
+

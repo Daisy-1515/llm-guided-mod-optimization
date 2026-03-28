@@ -12,7 +12,7 @@
 - dataCommon
 """
 import random
-from dataCommon import *
+from legacy_mod.dataCommon import *
 from dataclasses import dataclass, field
 from collections import defaultdict
 from typing import Dict

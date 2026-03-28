@@ -88,16 +88,16 @@ Notes:
 #### Common Commands
 
 ```bash
-uv run python testAll.py
-uv run python testEdgeUav.py
+uv run python scripts/testAll.py
+uv run python scripts/testEdgeUav.py
 uv run pytest tests -v
-uv run python check_llm_api.py
+uv run python scripts/check_llm_api.py
 ```
 
-- `uv run python testAll.py`: original MoD pipeline.
-- `uv run python testEdgeUav.py`: Edge-UAV pipeline.
+- `uv run python scripts/testAll.py`: original MoD pipeline.
+- `uv run python scripts/testEdgeUav.py`: Edge-UAV pipeline.
 - `uv run pytest tests -v`: unit and integration tests.
-- `uv run python check_llm_api.py`: quick validation of LLM connectivity.
+- `uv run python scripts/check_llm_api.py`: quick validation of LLM connectivity.
 
 ### Level 2: Architecture and Code Navigation
 
@@ -111,10 +111,10 @@ Read this section if you want to modify code, debug behavior, or add new modules
 
 #### Main Entry Points
 
-- `testAll.py`: original project entry.
-- `testEdgeUav.py`: Edge-UAV entry.
-- `check_llm_api.py`: API connectivity check.
-- `analyze_results.py`: result inspection and summary.
+- `scripts/testAll.py`: original project entry.
+- `scripts/testEdgeUav.py`: Edge-UAV entry.
+- `scripts/check_llm_api.py`: API connectivity check.
+- `scripts/analyze_results.py`: result inspection and summary.
 
 #### High-Level Directory Map
 
@@ -122,6 +122,7 @@ Read this section if you want to modify code, debug behavior, or add new modules
 - `prompt/`: prompt templates and prompt evolution logic for the original pipeline.
 - `heuristics/`: Harmony Search framework and population evolution.
 - `model/`: original optimization models.
+- `legacy_mod/`: original MoD shared data structures and scenario generation.
 - `edge_uav/`: Edge-UAV data model, prompts, scenario generation, and optimization blocks.
 - `simulator/`: simulation and evaluation logic for the original pipeline.
 - `tests/`: unit and integration tests.

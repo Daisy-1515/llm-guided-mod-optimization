@@ -1,4 +1,4 @@
-# LLM引导的按需出行优化系统 - 项目文档
+﻿# LLM引导的按需出行优化系统 - 项目文档
 
 ## 项目概述
 
@@ -258,7 +258,7 @@ city = NYC
 
 运行测试：
 ```bash
-python testAll.py
+python scripts/testAll.py
 ```
 
 ### 程序执行流程
@@ -542,4 +542,5 @@ class CustomModel(generalModel):
 
 **文档生成时间**: 2026-03-09
 **项目版本**: 基于NeurIPS 2025论文实现
+
 
