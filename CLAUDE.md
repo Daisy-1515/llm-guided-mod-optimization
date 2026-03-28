@@ -19,16 +19,18 @@
 
 ## 当前状态（自动更新）
 
-**更新时间**: 2026-03-27 21:42:27
+**更新时间**: 2026-03-28 14:35:00
 
 ### 项目进度
-- **Phase Status**: 🟢 Phase⑥ Step4 完成 — BCD 全链路通过
-- **Latest Commit**: 待提交（BCD 修复 4 个 bug，Level 1+2a+2b 全链路打通）
-- **Last Verified**: 冒烟测试通过（HS_POP_SIZE=2, HS_ITERATION=2）
+- **Phase Status**: 🟢 Phase⑦ Step4 完成 — BCD 效果验证完成，建议关闭 BCD
+- **Latest Commit**: 待提交（标准参数完整运行 + 对比分析报告）
+- **Last Verified**: ✅ BCD ON/OFF 各 10 代完整运行，100% 可行解
 
 ### 最新运行结果
-- **Latest Run**: `discussion/20260327_164104/` (2 generations)
-- **Status**: ✅ BCD 循环完全执行，无降级，最优值 31.77
+- **冒烟测试** (popSize=3, iter=3): best=31.77 (均相同)
+- **标准运行 BCD ON** (popSize=5, iter=10): `discussion/20260328_134903/` → best=31.77, 成功率 80%
+- **标准运行 BCD OFF** (popSize=5, iter=10): `discussion/20260328_134908/` → best=31.77, 成功率 100%
+- **结论**: BCD 轨迹优化在当前小规模场景下**无成本改进**，反而降低稳定性（80% vs 100%）
 
 ### LLM 配置
 - **LLM Model**: `qwen3.5-plus` (config/setting.cfg:7)
