@@ -2,6 +2,7 @@
 
 # Historical checklist created for the 2026-03-27 quick-validation phase.
 # Current project status is maintained in CLAUDE.md and the latest work diary.
+# This script is retained as a historical smoke checklist and may lag behind newer test additions.
 
 echo "========== PHASE 4 ACCEPTANCE CHECKLIST =========="
 echo ""
@@ -37,9 +38,9 @@ fi
 echo ""
 
 # 检查 4: Trajectory 单元测试全通过
-echo "[4] Trajectory unit tests (expect 12 passed)"
+echo "[4] Trajectory unit tests (expect 13 passed)"
 TRAJ_RESULT=$(uv run python -m pytest tests/test_trajectory_opt.py -q --tb=no 2>&1 | tail -1)
-if echo "$TRAJ_RESULT" | grep -q "12 passed"; then
+if echo "$TRAJ_RESULT" | grep -q "13 passed"; then
     echo "  PASS - $TRAJ_RESULT"
 else
     echo "  FAIL - $TRAJ_RESULT"

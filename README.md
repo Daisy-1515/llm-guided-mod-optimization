@@ -44,7 +44,7 @@ Read this section if you want to install dependencies and run something.
 
 #### Prerequisites
 
-- Python 3.10
+- Python 3.11-3.12
 - Gurobi and a valid `gurobipy` license
 - An LLM API endpoint if you want to run the LLM-guided pipeline
 
@@ -56,12 +56,7 @@ Recommended:
 uv sync
 ```
 
-Or use the original conda setup:
-
-```bash
-conda env create -f dependencies.yml
-conda activate llm-guided-mod-optimization
-```
+The historical `dependencies.yml`-based conda setup is no longer bundled in this repository.
 
 #### Configure LLM Access
 
@@ -90,12 +85,14 @@ Notes:
 ```bash
 uv run python scripts/testAll.py
 uv run python scripts/testEdgeUav.py
+HS_POP_SIZE=3 HS_ITERATION=5 uv run python scripts/testEdgeUav.py
 uv run pytest tests -v
 uv run python scripts/check_llm_api.py
 ```
 
 - `uv run python scripts/testAll.py`: original MoD pipeline.
 - `uv run python scripts/testEdgeUav.py`: Edge-UAV pipeline.
+- `HS_POP_SIZE=3 HS_ITERATION=5 uv run python scripts/testEdgeUav.py`: override Harmony Search population and iteration via environment variables.
 - `uv run pytest tests -v`: unit and integration tests.
 - `uv run python scripts/check_llm_api.py`: quick validation of LLM connectivity.
 
@@ -114,7 +111,7 @@ Read this section if you want to modify code, debug behavior, or add new modules
 - `scripts/testAll.py`: original project entry.
 - `scripts/testEdgeUav.py`: Edge-UAV entry.
 - `scripts/check_llm_api.py`: API connectivity check.
-- `scripts/analyze_results.py`: result inspection and summary.
+- `scripts/analyze_results.py`: result inspection and summary for both `discussion/<timestamp>/` and `discussion/experiment_results/<timestamp>/`.
 
 #### High-Level Directory Map
 
@@ -211,10 +208,12 @@ Relevant code is mainly under `edge_uav/`, `heuristics/`, `config/`, and `tests/
 - `config/env/.env` is not tracked by git and must be created locally.
 - Some LLM providers may require adapter changes in `llmAPI/`.
 - Results are typically written under `discussion/`.
+- Single-run HS outputs live under `discussion/<timestamp>/`.
+- Batch experiment outputs live under `discussion/experiment_results/<timestamp>/`.
 
 ## License
 
-This project is licensed under the MIT License. See `LICENSE` for details.
+This repository does not currently include a checked-in `LICENSE` file. Do not rely on this README section as a formal license grant until that file is restored.
 
 Some dependencies, especially Gurobi, require separate licenses.
 
