@@ -1,18 +1,10 @@
-import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from config.config import configPara
+from script_common import load_config
 from legacy_mod.scenarioGenerator import TaskGenerator
 from heuristics.hsFrame import HarmonySearchSolver
 
 
 def main():
-    params = configPara("./config/setting.cfg", "./config/env/.env")
-    params.getConfigInfo()
+    params = load_config("./config/setting.cfg", "./config/env/.env")
 
     scenario = TaskGenerator()
     scenario_info = scenario.getScenarioInfo(params)

@@ -11,17 +11,16 @@ it focuses on answering two questions before any paper-scale experiment:
 from __future__ import annotations
 
 import argparse
-import json
-import sys
 from copy import deepcopy
 from dataclasses import asdict, dataclass
-from datetime import datetime
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
+from script_common import (
+    apply_config_overrides,
+    apply_task_profile,
+    load_config,
+    make_edge_uav_scenario,
+    make_timestamped_output_dir,
+    write_json,
+)
 from config.config import configPara
 from edge_uav.model.bcd_loop import run_bcd_loop
 from edge_uav.model.evaluator import INVALID_OUTPUT_PENALTY, evaluate_solution
@@ -32,7 +31,6 @@ from edge_uav.model.precompute import (
     precompute_offloading_inputs,
 )
 from edge_uav.model.trajectory_opt import TrajectoryOptParams
-from edge_uav.scenario_generator import EdgeUavScenarioGenerator
 
 
 @dataclass(frozen=True)
@@ -121,32 +119,20 @@ def parse_args():
 
 
 def make_config(seed: int, overrides: dict[str, float | int]) -> configPara:
-    config = configPara(None, None)
-    config.getConfigInfo()
-    config.scenario_seed = seed
-    config.use_bcd_loop = False
-    config.popSize = 1
-    config.iteration = 1
-    for key, value in overrides.items():
-        setattr(config, key, value)
+    config = load_config()
+    apply_config_overrides(
+        config,
+        pop_size=1,
+        iteration=1,
+        use_bcd_loop=False,
+        scenario_seed=seed,
+        extra=overrides,
+    )
     return config
 
 
 def apply_task_mode(scenario, task_mode: str):
-    task_ids = sorted(scenario.tasks.keys())
-    midpoint = len(task_ids) // 2
-    for idx, task_id in enumerate(task_ids):
-        task = scenario.tasks[task_id]
-        if task_mode == "baseline":
-            continue
-        if task_mode == "relaxed_tau_low_local":
-            task.tau = 200.0
-            task.f_local = 1e6
-        elif task_mode == "mixed_local_vs_offload":
-            task.tau = 200.0
-            task.f_local = 1e9 if idx < midpoint else 1e6
-        else:
-            raise ValueError(f"Unknown task_mode: {task_mode}")
+    return apply_task_profile(scenario, task_mode)
 
 
 def make_traj_params(config: configPara) -> TrajectoryOptParams:
@@ -247,7 +233,7 @@ def run_bcd_default(scenario, params: PrecomputeParams, config: configPara):
 
 def run_case(case: ScenarioCase, seed: int):
     config = make_config(seed, case.config_overrides)
-    scenario = EdgeUavScenarioGenerator().getScenarioInfo(config)
+    scenario = make_edge_uav_scenario(config)
     apply_task_mode(scenario, case.task_mode)
 
     params = PrecomputeParams.from_config(config)
@@ -285,9 +271,10 @@ def run_case(case: ScenarioCase, seed: int):
 
 def main():
     args = parse_args()
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = Path(args.output_root) / f"edge_uav_bcd_diag_{timestamp}"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp, output_dir = make_timestamped_output_dir(
+        args.output_root,
+        prefix="edge_uav_bcd_diag",
+    )
 
     summary = {
         "created_at": timestamp,
@@ -303,10 +290,7 @@ def main():
             summary["results"].append(result)
 
     output_path = output_dir / "summary.json"
-    output_path.write_text(
-        json.dumps(summary, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    write_json(output_path, summary)
     print(f"[diag] wrote {output_path}")
     return 0
 

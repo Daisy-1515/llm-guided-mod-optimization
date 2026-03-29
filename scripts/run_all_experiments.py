@@ -14,20 +14,21 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import statistics
-import sys
 import time
-from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from config.config import configPara
+from script_common import (
+    apply_config_overrides,
+    clone_config,
+    get_simulation_step,
+    load_config,
+    make_edge_uav_scenario,
+    make_edge_uav_solver,
+    write_json,
+)
 from edge_uav.model.evaluator import INVALID_OUTPUT_PENALTY, evaluate_solution
 from edge_uav.model.offloading import OffloadingModel
 from edge_uav.model.precompute import (
@@ -35,8 +36,6 @@ from edge_uav.model.precompute import (
     make_initial_level2_snapshot,
     precompute_offloading_inputs,
 )
-from edge_uav.scenario_generator import EdgeUavScenarioGenerator
-from heuristics.hsFrame import HarmonySearchSolver
 from heuristics.hsIndividualEdgeUav import hsIndividualEdgeUav
 from heuristics.hs_way_constants import WAY_RANDOM
 
@@ -111,20 +110,20 @@ def parse_args():
 
 
 def make_params(args):
-    params = configPara(None, None)
-    params.getConfigInfo()
-    if args.hs_pop_size is not None:
-        params.popSize = args.hs_pop_size
-    if args.hs_iterations is not None:
-        params.iteration = args.hs_iterations
-    params.use_bcd_loop = bool(args.use_bcd_loop)
+    params = load_config()
+    apply_config_overrides(
+        params,
+        pop_size=args.hs_pop_size,
+        iteration=args.hs_iterations,
+        use_bcd_loop=args.use_bcd_loop,
+    )
     return params
 
 
 def make_scenario_bundle(base_params, seed):
-    params = deepcopy(base_params)
-    params.scenario_seed = seed
-    scenario = EdgeUavScenarioGenerator().getScenarioInfo(params)
+    params = clone_config(base_params)
+    apply_config_overrides(params, scenario_seed=seed)
+    scenario = make_edge_uav_scenario(params)
     precompute = precompute_offloading_inputs(
         scenario,
         PrecomputeParams.from_config(params),
@@ -139,7 +138,7 @@ def flatten_evaluations(evaluation_history):
     for generation_record in evaluation_history:
         generation = generation_record["generation"]
         for individual in generation_record["individuals"]:
-            step = (individual.get("simulation_steps") or {}).get("0") or {}
+            step = get_simulation_step(individual)
             score = float(individual.get("evaluation_score", INVALID_OUTPUT_PENALTY))
             flattened.append(
                 {
@@ -189,14 +188,8 @@ def summarize_history(history):
     }
 
 
-def write_json(path, payload):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
 def run_group_a(bundle):
-    solver = HarmonySearchSolver(bundle.params, bundle.scenario, individual_type="edge_uav")
-    solver.pop.timeout = 600
+    solver = make_edge_uav_solver(bundle.params, bundle.scenario)
     started = time.time()
     solver.run()
     wall_time_sec = time.time() - started
@@ -253,13 +246,13 @@ def run_group_b(bundle):
 
 
 def run_group_random_hs(bundle, mode, group_name):
-    bundle.params.random_hs_mode = mode
-    solver = HarmonySearchSolver(
-        bundle.params,
+    params = clone_config(bundle.params)
+    apply_config_overrides(params, extra={"random_hs_mode": mode})
+    solver = make_edge_uav_solver(
+        params,
         bundle.scenario,
         individual_type="edge_uav_random",
     )
-    solver.pop.timeout = 600
     started = time.time()
     solver.run()
     wall_time_sec = time.time() - started
@@ -267,7 +260,7 @@ def run_group_random_hs(bundle, mode, group_name):
     return {
         "group": group_name,
         "label": f"random_hs_{mode}",
-        "eval_budget_target": bundle.params.popSize * bundle.params.iteration,
+        "eval_budget_target": params.popSize * params.iteration,
         "eval_budget_used": len(history),
         "llm_calls": 0,
         "wall_time_sec": wall_time_sec,

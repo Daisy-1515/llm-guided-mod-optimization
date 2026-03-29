@@ -8,21 +8,11 @@ Environment variable override:
 """
 
 import os
-import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from config.config import configPara
-from edge_uav.scenario_generator import EdgeUavScenarioGenerator
-from heuristics.hsFrame import HarmonySearchSolver
+from script_common import load_config, make_edge_uav_scenario, make_edge_uav_solver
 
 
 def main():
-    params = configPara(None, None)
-    params.getConfigInfo()
+    params = load_config()
 
     params.popSize = int(os.environ.get("HS_POP_SIZE", params.popSize))
     params.iteration = int(os.environ.get("HS_ITERATION", params.iteration))
@@ -35,11 +25,9 @@ def main():
             "LLM config missing. Check config/setting.cfg + config/env/.env"
         )
 
-    gen = EdgeUavScenarioGenerator()
-    scenario = gen.getScenarioInfo(params)
+    scenario = make_edge_uav_scenario(params)
 
-    hs = HarmonySearchSolver(params, scenario, individual_type="edge_uav")
-    hs.pop.timeout = 600
+    hs = make_edge_uav_solver(params, scenario)
     hs.run()
 
 

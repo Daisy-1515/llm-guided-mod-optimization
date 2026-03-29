@@ -10,14 +10,9 @@
 
 import sys
 import time
-from pathlib import Path
 from urllib.parse import urlparse
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from config.config import configPara
+from script_common import load_config
 from llmAPI.llmInterface import InterfaceAPI
 
 
@@ -30,8 +25,7 @@ def _mask_endpoint(endpoint):
 
 
 def main():
-    config = configPara(None, None)
-    config.getConfigInfo()
+    config = load_config()
 
     # ---- 诊断信息 ----
     print(
