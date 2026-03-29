@@ -171,6 +171,10 @@ class EdgeUavScenarioGenerator:
             if float(val) <= 0.0:
                 errors.append(f"{name} must be > 0, got {val}")
 
+        n_max = getattr(config, "N_max", None)
+        if n_max is not None and int(n_max) < 1:
+            errors.append(f"N_max must be >= 1 or None, got {n_max}")
+
         if errors:
             raise ValueError("Invalid Edge UAV config:\n- " + "\n- ".join(errors))
 
@@ -244,7 +248,7 @@ class EdgeUavScenarioGenerator:
                 pos_final=depot_pos,
                 E_max=float(config.E_max),
                 f_max=float(config.f_max),
-                N_max=None,
+                N_max=getattr(config, "N_max", None),
             )
         return uavs
 
