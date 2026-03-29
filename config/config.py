@@ -103,6 +103,7 @@ class configPara:
         # UAV 硬件默认值
         self.E_max = 5000.0     # 能量预算 (J)
         self.f_max = 1e10       # 最大 CPU 频率 (Hz)
+        self.N_max = 1          # 每时隙最大承载任务数；None 表示无限制
 
         # 任务生成参数
         self.D_l_min = 5e6              # 上行数据量下界 (bits)
@@ -204,6 +205,24 @@ def dynamic_obj_func(self):
             
         return default
 
+    def get_optional_int_config(self, section, key, default=None):
+        """Read an optional integer config field, allowing 'none' / 'null'."""
+        raw_val = self.get_config_value(section, key, default, cast=None)
+        if raw_val is None:
+            return None
+        if isinstance(raw_val, int):
+            return raw_val
+
+        text = str(raw_val).strip().lower()
+        if text in ("none", "null", "unlimited"):
+            return None
+
+        try:
+            return int(text)
+        except ValueError:
+            print(f" Invalid optional int config: [{section}] {key}={raw_val!r} ")
+            exit()
+
     def getConfigInfo(self):
         """Load configuration values into class attributes."""
         # llm settings
@@ -263,6 +282,7 @@ def dynamic_obj_func(self):
         # UAV 硬件
         self.E_max = self.get_config_value('edgeUavHardware', 'E_max', self.E_max, cast=float)
         self.f_max = self.get_config_value('edgeUavHardware', 'f_max', self.f_max, cast=float)
+        self.N_max = self.get_optional_int_config('edgeUavHardware', 'N_max', self.N_max)
 
         # 优化权重
         self.alpha = self.get_config_value('edgeUavWeights', 'alpha', self.alpha, cast=float)
