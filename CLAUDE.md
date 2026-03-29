@@ -17,14 +17,14 @@
 
 ## 当前状态
 
-**更新时间**: 2026-03-29 01:09:31
+**更新时间**: 2026-03-29 16:35:00
 
 ### 项目进度
 
-- **Phase Status**: Phase⑥ Step4 已完成验证，当前进入结构清理与归档阶段
+- **Phase Status**: Phase⑦ Step2 全时段激活实验完成 — **方案失效**
 - **最新稳定提交**: `9c78066` `refactor(structure): move entry scripts out of repo root`
 - **最新文档提交**: `5cd9499` `docs(diag): move Phase4 diagnostic guide into audit docs`
-- **最近提交**: `3bafa76` `docs: end-of-day routine (2026-03-29)`
+- **最近提交**: `94f01a8` `chore: enable full-time task activation (active_window 10-15 -> 30 slots)`
 
 ### 当前代码结构结论
 
@@ -33,11 +33,26 @@
 - 原始 MoD 共享模块迁移到 [`legacy_mod/`](legacy_mod)
 - `PHASE4_DIAGNOSTIC_GUIDE.md` 已迁移到 [`文档/40_审查与诊断/Phase4_诊断指南_2026-03-27.md`](文档/40_审查与诊断/Phase4_诊断指南_2026-03-27.md)
 
-### 最新运行/实验结论
+### 最新运行/实验结论 (Phase⑦ Step2 - 2026-03-29)
 
-- BCD ON/OFF 在 2026-03-28 的 10 代标准参数运行中最优值一致，均为 `31.7735`
-- 小规模场景下，BCD 没带来成本收益，但稳定性低于 BCD OFF
-- 当前推荐默认阅读和运行入口以 `scripts/` 目录为准
+**Full-Time Task Activation Experiment (全时段激活)**
+
+实验目标：扩展任务活跃时间（10-15 → 30 时隙）以扩大 LLM 优化空间
+
+**结果**：❌ 方案**完全失效**
+- 小规模 (15t×3u): A = 944.19, D1 = 944.19 → **0% 改进**
+- 中规模 (20t×5u): A = 944.19, D1 = 944.19 → **0% 改进**
+
+**根本原因**：
+- ✅ 配置成功应用（active_window_min/max = 30 已确认）
+- ❌ D1 目标函数在该参数配置下已达**局部/全局最优**
+- ❌ 问题不在约束强度，而在**目标函数本身**
+
+**后续方向**：
+1. 验证 D1 的理论最优性（LP 松弛分析）
+2. 调整模型权重（alpha, gamma_w, lambda_w）
+3. 重新设计目标函数权重分配
+4. 保留全时段配置供后续参数调整使用
 
 ### 当前工作区状态
 
