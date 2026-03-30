@@ -20,7 +20,6 @@
 |------|------|---------|
 | **[`配置指南.md`](配置指南.md)** | **常见操作和配置** (推荐二读) | 2026-03-25 |
 | [`场景生成器设计方案.md`](场景生成器设计方案.md) | Edge UAV 场景生成器设计（固定 depot、活跃窗口、EdgeUavScenario） | 2026-02-28 |
-| [`plans/chapter3-system-model-plan.md`](../plans/chapter3-system-model-plan.md) | 论文第 3 章结构规划（5 节、Gemini + Codex review） | 2026-03-20 |
 | [`plans/phase6-step3-socp-fix-plan.md`](../plans/phase6-step3-socp-fix-plan.md) | Phase⑥ Step3 SOCP 修复计划（7 步、25-26h、数学推导） | 2026-03-25 |
 
 ## 📊 代码审查与诊断

@@ -1,4 +1,14 @@
-﻿# Project Structure Analysis Report
+﻿---
+⚠️ **归档文档** — 不再活跃维护
+
+**状态**：存档于 archive/ 目录
+**最后更新**：2026-03-初期
+**理由**：英文版项目结构分析，已被中文版和项目内 CLAUDE.md 取代
+**当前参考**：[项目/CLAUDE.md](../../CLAUDE.md)
+
+---
+
+# Project Structure Analysis Report
 
 ## Project Overview
 
