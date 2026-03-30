@@ -1,14 +1,14 @@
 """
-* File: hsIndividual.py
-* Author: Yi
+* 文件: hsIndividual.py
+* 作者: Yi
 *
-* created on 2025/01/27
+* 创建日期: 2025/01/27
 """
 """
 @package hsIndividual.py
-@brief This module handles each complete run to generate a complete individual.
+@brief 此模块处理生成完整个体的每次完整运行。
 
-@dependencies
+@依赖项
 - prompt.modPrompt
 - simulator.SimClass
 - model.two_level.AssignmentModel
@@ -26,7 +26,7 @@ import copy
 class hsIndividual:
     """
     @class hsIndividual
-    @brief Manages each complete run to generate a complete individual.
+    @brief 管理生成完整个体的每次完整运行。
     """
     def __init__(self, configPara, scenario):
 
@@ -41,25 +41,29 @@ class hsIndividual:
             'evaluation_score':None}
 
     def way1Run(self, Idx, passengerInfo, taxiInfo):
+        """方式1运行 (通常为随机/初始)。"""
         prompt = self.prompt.get_prompt_way1(Idx, passengerInfo, taxiInfo)
         response = self.api.getResponse(prompt)
 
         return response
 
     def way2Run(self, Idx, passengerInfo, taxiInfo, p):
+        """方式2运行 (记忆考虑)。"""
         prompt = self.prompt.get_prompt_way2(Idx, passengerInfo, taxiInfo, p)
         response = self.api.getResponse(prompt)
 
         return response
 
     def way3Run(self, Idx, passengerInfo, taxiInfo, p):
+        """方式3运行 (音调调节)。"""
         prompt = self.prompt.get_prompt_way3(Idx, passengerInfo, taxiInfo, p)
         response = self.api.getResponse(prompt)
 
         return response
 
     def getNewPrompt(self, p, way, loopIdx, taxiInfo, passengerInfo):
-        # convert taxiInfo and passengerInfo from dictionary to string
+        """根据选定的和弦搜索方式生成新提示词。"""
+        # 将出租车信息和乘客信息从字典转换为字符串
         taxi_str = self.convert_taxi_dict_to_str(taxiInfo)
         passenger_str = self.convert_passenger_dict_to_str(passengerInfo)
         if way == WAY_RANDOM:
@@ -69,7 +73,7 @@ class hsIndividual:
         elif way == WAY_PITCH:
             res = self.way3Run(loopIdx, passenger_str, taxi_str, p)
         else:
-            raise ValueError(f"Unsupported classic HS way: {way}")
+            raise ValueError(f"不支持的经典 HS 方式: {way}")
 
         resToSave = {"taxi_info":taxi_str,
                      "passenger_info": passenger_str,
@@ -78,6 +82,7 @@ class hsIndividual:
         return res, resToSave
 
     def getInputStr(self, taxiInfo, passengerInfo):
+        """获取输入字符串。"""
         taxi_str = self.convert_taxi_dict_to_str(taxiInfo)
         passenger_str = self.convert_passenger_dict_to_str(passengerInfo)
         resToSave = {"taxi_info":taxi_str,
@@ -88,7 +93,7 @@ class hsIndividual:
         return resToSave
 
     def convert_taxi_dict_to_str(self, taxi_dict: dict) -> str:
-        """Convert taxi dictionary to human-readable string"""
+        """将出租车字典转换为人类可读的字符串。"""
         if not taxi_dict:
             return "No taxis available"
 
@@ -102,7 +107,7 @@ class hsIndividual:
         return "\n".join(entries)
 
     def convert_passenger_dict_to_str(self, passenger_dict: dict) -> str:
-        """Convert passenger dictionary to human-readable string"""
+        """将乘客字典转换为人类可读的字符串。"""
         if not passenger_dict:
             return "No passengers waiting"
 

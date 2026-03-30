@@ -1,14 +1,14 @@
 """
-* File: hsFrame.py
-* Author: Yi 
+* 文件: hsFrame.py
+* 作者: Yi 
 *
-* created on 2025/01/27
+* 创建日期: 2025/01/27
 """
 """
 @package hsFrame.py
-@brief This module handles the framework of evolutionary solver.
+@brief 此模块处理进化求解器的框架。
 
-@dependencies
+@依赖项
 - heuristics.hsPopulation
 - heuristics.hsSorting / heuristics.hsDiversitySorting
 """
@@ -22,7 +22,7 @@ import os
 class HarmonySearchSolver:
     """
     @class HarmonySearchSolver
-    @brief Manages the prompt evolution framework.
+    @brief 管理提示词 (Prompt) 进化框架。
     """
     def __init__(self, configPara, scenarioInfo, individual_type="multi_call"):
         self.popsize = configPara.popSize
@@ -49,8 +49,8 @@ class HarmonySearchSolver:
     def save_population(self, pop, iteration):
         os.makedirs(self.out_dir, exist_ok=True)
         filename = os.path.join(self.out_dir, f"population_result_{iteration}.json")
-        with open(filename, 'w') as f:
-            json.dump(pop, f, indent=4, default=self._json_default)
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(pop, f, indent=4, default=self._json_default, ensure_ascii=False)
     
     def combine_population(self, pop1, pop2):
         return pop1+pop2
@@ -109,7 +109,7 @@ class HarmonySearchSolver:
         self.final_population = sortPop
         return sortPop
 
-# Example usage
+# 示例用法
 if __name__ == "__main__":
     solver = HarmonySearchSolver()
     solver.run()

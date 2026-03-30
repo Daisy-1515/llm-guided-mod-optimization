@@ -141,7 +141,7 @@ class hsIndividualEdgeUav:
         if not way:
             way = "default"
         elif way != "default" and way not in VALID_EDGE_UAV_WAYS:
-            raise ValueError(f"Unsupported edge_uav way: {way}")
+            raise ValueError(f"不支持的 edge_uav 方式: {way}")
         return parent, str(way)
 
     def _synthesize_llm_response(self):
@@ -156,9 +156,9 @@ class hsIndividualEdgeUav:
         """初始化 BCD 循环所需的参数。
 
         处理 4 种参数组合情况：
-          Case A: shared_precompute=True (self.params=None)
-          Case B: shared_precompute=False (self.params 已设置)
-          Case C: 多代热启动 (self._parent_snapshot 可用)
+          分支 A: shared_precompute=True (self.params=None)
+          分支 B: shared_precompute=False (self.params 已设置)
+          分支 C: 多代热启动 (self._parent_snapshot 可用)
 
         Returns:
             (PrecomputeParams, TrajectoryOptParams, Level2Snapshot)
@@ -417,9 +417,8 @@ class hsIndividualEdgeUav:
                 feasible, cost, bcd_meta = self._adapt_bcd_result_to_legacy(
                     bcd_result, bcd_result.offloading_outputs, self.precompute_result
                 )
-                # Recompute precompute tensors on the final BCD snapshot before
-                # scoring. Otherwise evaluation_score stays tied to the
-                # initialization snapshot and hides any BCD effect.
+                # 在评分前，基于最终的 BCD 快照重新计算预计算张量。
+                # 否则 evaluation_score 将仍与初始快照关联，从而掩盖 BCD 的优化效果。
                 final_precompute_result = precompute_offloading_inputs(
                     self.scenario,
                     params,
@@ -439,7 +438,7 @@ class hsIndividualEdgeUav:
                     final_precompute_result.diagnostics
                 )
                 full_info["response_format"] = (
-                    bcd_result.offloading_error_message or "BCD objective status unavailable"
+                    bcd_result.offloading_error_message or "BCD 目标状态不可用"
                 )
                 full_info["used_default_obj"] = bool(bcd_result.used_default_obj)
 
@@ -511,7 +510,7 @@ class hsIndividualEdgeUav:
                 # 原始 Level 1 响应格式
                 full_info["response_format"] = (
                     model.error_message if 'model' in locals() and hasattr(model, 'error_message')
-                    else "None Obj. Using default obj."
+                    else "无目标函数。使用默认目标。"
                 )
         full_info["feasible"] = bool(feasible)
         full_info["solver_cost"] = float(cost)

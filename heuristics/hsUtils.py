@@ -1,22 +1,25 @@
 """
-* File: hsUtils.py
-* Author: Ni Yun
+* 文件: hsUtils.py
+* 作者: Ni Yun
 *
-* created on 2025/02/20
+* 创建日期: 2025/02/20
 """
 
 import json
 import re
 
 def json_load(parse_func):
+    """
+    JSON 加载装饰器，用于尝试从 LLM 回复中解析 JSON 对象。
+    """
     def wrapper(json_response):
         try:
-            # Try parsing the response as a single JSON object
+            # 尝试将整个响应解析为单个 JSON 对象
             response = json.loads(json_response)
             if parse_func(response):
                 return parse_func(response)
         except json.JSONDecodeError:
-            # If JSON parsing fails, attempt to extract multiple JSON objects
+            # 如果解析失败，尝试提取回复中的多个 JSON 对象（处理包含解释文本的情况）
             json_objects = re.findall(r'\{.*?\}', json_response, re.DOTALL)
             for obj in json_objects:
                 try:
@@ -26,8 +29,8 @@ def json_load(parse_func):
                 except json.JSONDecodeError:
                     continue
 
-        # If obj_code is not found, return an empty string
-        print("Warning: Could not extract from json response.")
+        # 如果未找到 obj_code，返回空字符串
+        print("警告: 无法从 JSON 响应中提取内容。")
         return " "
 
     return wrapper
@@ -35,11 +38,14 @@ def json_load(parse_func):
 
 @json_load
 def extract_code_hsPopulation(response):
+    """
+    从种群更新阶段的 LLM 响应中提取代码。
+    """
     if isinstance(response, dict):
         if "obj_code" in response:
             return response["obj_code"]
 
-        # If obj_code is nested, search for it recursively
+        # 如果 obj_code 被嵌套，递归搜索
         for value in response.values():
             if isinstance(value, dict) and "obj_code" in value:
                 return value["obj_code"]
@@ -47,9 +53,8 @@ def extract_code_hsPopulation(response):
 
 @json_load
 def extract_code_hsIndiv(response):
+    """
+    从单体运行阶段的 LLM 响应中提取代码。
+    """
     if "obj_code" in response:
         return response["obj_code"]
-
-
-
-

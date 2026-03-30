@@ -1,12 +1,12 @@
 """
-* File: hsSorting.py
-* Author: Yi
+* 文件: hsSorting.py
+* 作者: Yi
 *
-* created on 2025/01/27
+* 创建日期: 2025/01/27
 """
 """
 @package hsSorting.py
-@brief This module handles the sorting of individuals in each population.
+@brief 此模块处理每个种群中个体的排序。
 """
 
 import numpy as np
@@ -16,43 +16,47 @@ from collections import defaultdict
 class hsSorting:
     def sort_population(self, population, popsize):
         """
-        Sorts the population based on the 'evaluation_score' in ascending order.
+        基于 'evaluation_score' 对种群进行升序排序。
 
-        Args:
-            population (list): List of individual solutions (dictionaries).
-            popsize (int): Number of individuals to retain after sorting.
+        参数:
+            population (list): 个体解的列表（字典形式）。
+            popsize (int): 排序后保留的个体数量。
 
-        Returns:
-            list: Sorted population of length popsize.
+        返回:
+            list: 长度为 popsize 的已排序种群。
         """
-        # Sort population by 'evaluation_score'
+        # 按 'evaluation_score' 排序种群
         sorted_population = sorted(population, key=lambda ind: ind['evaluation_score'])
 
-        # Return the top 'popsize' individuals
+        # 返回前 'popsize' 个个体
         return sorted_population[:popsize]
     
 class hsDiversitySorting:
+    """
+    带有多样性考虑的种群排序。
+    """
     def __init__(self, similarity_threshold=0.8):
         try:
             from sentence_transformers import SentenceTransformer
         except Exception as exc:
             raise RuntimeError(
-                "hsDiversitySorting requires sentence-transformers and a working torch runtime."
+                "hsDiversitySorting 需要 sentence-transformers 和运行正常的 torch 环境。"
             ) from exc
         self.model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         self.similarity_threshold = similarity_threshold
         
     def compute_similarity(self, emb_i, emb_j):
+        """计算余弦相似度。"""
         return np.dot(emb_i, emb_j) / (np.linalg.norm(emb_i) * np.linalg.norm(emb_j))
 
     def sort_population(self, population, popsize):
-        # Sort population by 'evaluation_score'
+        # 首先按 'evaluation_score' 排序
         sorted_population = sorted(population, key=lambda ind: ind['evaluation_score'])
         selected_population = []
         non_selected_population = []
         embeddings = {}
         
-        # Group individuals by their evaluation score
+        # 按评估得分对个体进行分组
         grouped_population = defaultdict(list)
         for ind in sorted_population:
             grouped_population[ind['evaluation_score']].append(ind)
@@ -68,23 +72,25 @@ class hsDiversitySorting:
                         llm_response_dict = json.loads(ind['simulation_steps'][key]['llm_response'])
                         obj_code += llm_response_dict['obj_code']
                 
+                # 为目标函数代码计算嵌入 (embedding)
                 embedding = self.model.encode(obj_code, convert_to_numpy=True)
                 embeddings[obj_code] = embedding
                 
-                # Check similarity within the same evaluation score layer
+                # 检查同一评估得分层内的相似度
                 if all(self.compute_similarity(embedding, embeddings[sel['obj_code']]) < self.similarity_threshold for sel in group_input):
-                    group_input['obj_code'] = obj_code  # Store obj_code to reference later
+                    group_input['obj_code'] = obj_code  # 记录 obj_code 以供后续参考
                     layer_selected.append(ind)
                 else:
                     non_selected_population.append(ind)
                 
+                # 如果已选个体达到 popsize，则直接返回
                 if len(selected_population) + len(layer_selected) >= popsize:
                     selected_population.extend(layer_selected[:popsize - len(selected_population)])
                     return selected_population
             
             selected_population.extend(layer_selected)
         
-        # Fill remaining slots from non-selected based on evaluation_score
+        # 如果插槽未满，从非优选集中按 evaluation_score 填充
         for ind in non_selected_population:
             if len(selected_population) < popsize:
                 selected_population.append(ind)

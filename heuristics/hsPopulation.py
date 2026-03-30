@@ -1,14 +1,14 @@
 """
-* File: hsPopulation.py
-* Author: Yi
+* 文件: hsPopulation.py
+* 作者: Yi
 *
-* created on 2025/01/27
+* 创建日期: 2025/01/27
 """
 """
 @package hsPopulation.py
-@brief This module handles the population updates of evolutionary solver.
+@brief 此模块处理进化求解器的种群更新。
 
-@dependencies
+@依赖项
 - heuristics.hsIndividual
 - heuristics.hsIndividualMultiCall
 """
@@ -23,17 +23,17 @@ from heuristics.hs_way_constants import WAY_CROSS, WAY_MEMORY, WAY_PITCH, WAY_RA
 class hsPopulation:
     """
     @class hsPopulation
-    @brief Manages the the population updates of evolutionary solver.
+    @brief 管理进化求解器的种群更新。
     """
     def __init__(self, configPara, scenario, timeout = 300, individual_type = "multi_call"):
 
         self.config = configPara
         self.scenario = scenario
         self.popsize = int(configPara.popSize)
-        self.HMCR = configPara.HMCR  # Harmony Memory Considering Rate
-        self.PAR = configPara.PAR   # Pitch Adjusting Rate
+        self.HMCR = configPara.HMCR  # 和弦库考虑率 (Harmony Memory Considering Rate)
+        self.PAR = configPara.PAR   # 音调调节率 (Pitch Adjusting Rate)
 
-        # Individual class routing
+        # 个体类路由选择
         if individual_type == "multi_call":
             self.IndividualClass = hsIndividualMultiCall
         elif individual_type == "edge_uav":
@@ -43,7 +43,7 @@ class hsPopulation:
             from heuristics.hsIndividualRandom import hsIndividualRandom
             self.IndividualClass = hsIndividualRandom
         else:
-            raise ValueError(f"Unsupported individual_type: {individual_type}")
+            raise ValueError(f"不支持的个体类型: {individual_type}")
         self._is_edge_uav = individual_type in {"edge_uav", "edge_uav_random"}
 
         # Edge UAV: 预计算一次，共享给所有个体（只读，线程安全）
@@ -78,21 +78,23 @@ class hsPopulation:
             ]
 
     def initialize_population(self):
+        """初始化种群。"""
         try:
             return self._run_parallel(self.get_init_ind)
         except Exception as e:
-            raise RuntimeError(f"initialize_population failed: {e}") from e
+            raise RuntimeError(f"initialize_population 失败: {e}") from e
 
     def generate_new_population(self, pop):
+        """基于当前种群生成新一代个体。"""
         try:
             return self._run_parallel(self.get_new_ind, pop)
         except Exception as e:
-            raise RuntimeError(f"generate_new_population failed: {e}") from e
+            raise RuntimeError(f"generate_new_population 失败: {e}") from e
 
     def _make_individual(self, parent_snapshot=None):
         """创建个体实例，edge_uav 模式下传入共享预计算结果和热启动快照。
 
-        Args:
+        参数:
             parent_snapshot: 来自前代的最优快照（用于热启动）
         """
         if self._is_edge_uav:
@@ -109,10 +111,10 @@ class hsPopulation:
     def _extract_parent_snapshot(self, parent_individual_prompt_history):
         """从父代个体的 promptHistory 中提取最优快照，用于下一代 BCD 热启动。
 
-        Args:
+        参数:
             parent_individual_prompt_history: 父代个体返回的 promptHistory 字典
 
-        Returns:
+        返回:
             Level2Snapshot 或 None
             - 若 BCD 启用且成功，返回 optimal_snapshot（用于热启动）
             - 若 BCD 未启用或失败，返回 None（降级至默认初始化）
@@ -134,11 +136,11 @@ class hsPopulation:
             return None
         except Exception as e:
             # 快照提取失败，降级至默认初始化
-            print(f"[hsPopulation] _extract_parent_snapshot failed: {e}, using default initialization")
+            print(f"[hsPopulation] _extract_parent_snapshot 失败: {e}, 使用默认初始化")
             return None
 
     def get_init_ind(self):
-
+        """获取初始个体。"""
         ind = self._make_individual()
         if self._is_edge_uav:
             ind.runOptModel("", WAY_RANDOM)
@@ -147,19 +149,19 @@ class hsPopulation:
         return ind.promptHistory
 
     def get_new_ind(self, pop):
-
+        """获取通过和弦搜索生成的新个体。"""
         p, way, parent_snapshot = self.generate_new_harmony(pop)
 
         # Phase⑥ Step4: 如果有父代快照，传递用于 BCD 热启动
         ind = self._make_individual(parent_snapshot=parent_snapshot)
 
-        # arrange prompt to get objective cost
+        # 安排提示词以获取目标函数成本
         ind.runOptModel(p, way)
 
         return ind.promptHistory
 
     def generate_new_harmony(self, pop):
-        """生成新和弦，返回 (prompt, way, parent_snapshot)。
+        """生成新和弦 (New Harmony)，返回 (prompt, way, parent_snapshot)。
 
         Phase⑥ Step4: 支持热启动快照传递
         """
@@ -170,38 +172,39 @@ class hsPopulation:
 
         for t in range(self.steps):
             if random.random() >= self.HMCR:
-                # Random generation
+                # 随机生成 (Random generation)
                 p.append("")
                 way.append(WAY_RANDOM)
             else:
-                # Memory consideration
+                # 记忆考虑 (Memory consideration)
                 idx = random.randint(0, rd - 1) if rd > 2 else 0
                 print(f"[Harmony] step {t:02d}: selected individual idx={idx}, popsize={self.popsize})")
                 ind = pop[idx]
 
                 # Phase⑥ Step4: 从父代提取最优快照（用于 BCD 热启动）
-                if self._is_edge_uav and t == 0:  # Edge UAV 只有 single step
+                if self._is_edge_uav and t == 0:  # Edge UAV 只有单步 (single step)
                     parent_snapshot = self._extract_parent_snapshot(ind)
 
                 parent = self.shrink_token_size(ind)
                 if random.random() > self.PAR:
-                    # prompt way 2
+                    # 提示词生成方式 2 (WAY_MEMORY)
                     p.append(parent)
                     way.append(WAY_MEMORY)
                 else:
-                    # Pitch adjustment: Edge UAV may sample way4
+                    # 音调调节 (Pitch adjustment): Edge UAV 可能采样 WAY_CROSS
                     p.append(parent)
                     if self._is_edge_uav:
                         way.append(random.choice([WAY_PITCH, WAY_CROSS]))
                     else:
                         way.append(WAY_PITCH)
 
-        # Edge UAV: single step → unwrap to scalar
+        # Edge UAV: 单步 → 解包为标量
         if self._is_edge_uav:
             return p[0], way[0], parent_snapshot
         return p, way, parent_snapshot
 
     def shrink_token_size(self, p):
+        """压缩提示词历史的 Token 占用，仅保留核心代码。"""
         shrinked_p = {}
         shrinked_p['evaluation_score'] = p['evaluation_score']
         shrinked_p['simulation_steps'] = {}
@@ -214,13 +217,13 @@ class hsPopulation:
                 obj_code = " "
                 llm_response_str = p['simulation_steps'][key]['llm_response']
                 if p['simulation_steps'][key]['response_format'] != "Response format does not meet the requirements" and not llm_response_str.startswith("Model too busy"):
-                    #obj_code = self.extract_obj_code(llm_response_str)
+                    # 提取目标函数代码
                     obj_code = hsUtils.extract_code_hsPopulation(llm_response_str)
 
                 shrinked_p['simulation_steps'][key]['llm_response'] = obj_code
                 shrinked_p['simulation_steps'][key]['response_format'] = p['simulation_steps'][key]['response_format'] 
 
         except Exception as e:
-            raise RuntimeError(f"shrink_token_size failed: {e}\n{shrinked_p}") from e
+            raise RuntimeError(f"shrink_token_size 失败: {e}\n{shrinked_p}") from e
 
         return shrinked_p

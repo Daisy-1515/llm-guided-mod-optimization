@@ -1,11 +1,10 @@
-"""Non-LLM objective generator for Edge-UAV HS baselines.
+"""为 Edge-UAV HS 基准测试生成的非 LLM 目标函数。
 
-This module mirrors the hsIndividualEdgeUav interface but replaces LLM calls
-with synthetic objective-code generation. It supports two baseline modes:
+此模块映射了 hsIndividualEdgeUav 的接口，但通过合成的代码生成替代了 LLM 调用。
+它支持两种基准测试模式：
 
-- ``parametric``: fixed objective structure with randomized weights.
-- ``template``: small library of hand-written objective templates with weight
-  mutations, used as a stronger no-LLM HS baseline.
+- ``parametric``: 固定目标结构，但权重是随机的。
+- ``template``: 由手写目标模板组成的小型库，带权重的变异，用于更强的非 LLM HS 基准。
 """
 
 from __future__ import annotations
@@ -30,8 +29,8 @@ from heuristics.hs_way_constants import (
 )
 
 
-_FORMAT_ERROR_SENTINEL = "Response format does not meet the requirements"
-_OBJ_SUCCESS_MSG = "Your obj function is correct. Gurobi accepts your obj."
+_FORMAT_ERROR_SENTINEL = "响应格式不符合要求"
+_OBJ_SUCCESS_MSG = "您的目标函数是正确的。Gurobi 接受了您的目标。"
 _META_RE = re.compile(
     r"# META: family=(?P<family>[a-z_]+) "
     r"alpha_scale=(?P<alpha>[0-9eE.+-]+) "
@@ -42,7 +41,7 @@ _TEMPLATE_FAMILIES = ("weighted_default", "split_delay", "urgency_bias")
 
 
 class hsIndividualRandom:
-    """Edge-UAV HS individual that samples objective code without LLM."""
+    """Edge-UAV 的 HS 单个体，无需 LLM 即可采样目标函数代码。"""
 
     def __init__(self, configPara, scenario, *, shared_precompute=None):
         self.config = configPara
@@ -66,6 +65,7 @@ class hsIndividualRandom:
 
     @staticmethod
     def _normalize_inputs(parent, way):
+        """规格化 hsPopulation 可能传入的输入格式。"""
         if isinstance(parent, list):
             parent = parent[0] if parent else ""
         if isinstance(way, list):
@@ -75,19 +75,22 @@ class hsIndividualRandom:
         if not way:
             way = WAY_RANDOM
         elif way != "default" and way not in VALID_EDGE_UAV_WAYS:
-            raise ValueError(f"Unsupported edge_uav way: {way}")
+            raise ValueError(f"不支持的 edge_uav 方式: {way}")
         return parent, str(way)
 
     @staticmethod
     def _clamp_scale(value):
+        """将缩放值限制在合理范围内 [0.05, 20.0]。"""
         return max(0.05, min(20.0, float(value)))
 
     @staticmethod
     def _sample_scale():
+        """从对数均匀分布中采样一个缩放系数。"""
         return 10 ** random.uniform(-1.0, 1.0)
 
     @classmethod
     def _extract_parent_code(cls, parent):
+        """从父代历史中提取最近的目标代码。"""
         if isinstance(parent, dict):
             steps = parent.get("simulation_steps") or {}
             try:
@@ -105,6 +108,7 @@ class hsIndividualRandom:
 
     @classmethod
     def _extract_parent_meta(cls, parent):
+        """提取父代目标的元数据标签。"""
         code = cls._extract_parent_code(parent)
         match = _META_RE.search(code)
         if not match:
@@ -117,6 +121,7 @@ class hsIndividualRandom:
         }
 
     def _pick_family(self, parent_meta, way):
+        """基于和弦搜索的选择方式确定模板家族。"""
         if self.mode == "parametric":
             return "weighted_default"
 
@@ -132,6 +137,7 @@ class hsIndividualRandom:
         return parent_meta["family"]
 
     def _pick_scales(self, parent, way):
+        """基于 HS 策略演练权重系数。"""
         parent_meta = self._extract_parent_meta(parent)
         family = self._pick_family(parent_meta, way)
 
@@ -160,6 +166,7 @@ class hsIndividualRandom:
 
     @staticmethod
     def _build_objective_code(family, alpha_scale, gamma_scale, offload_scale):
+        """拼接生成的 Python 目标函数代码。"""
         header = (
             f"# META: family={family} alpha_scale={alpha_scale:.12g} "
             f"gamma_scale={gamma_scale:.12g} offload_scale={offload_scale:.12g}\n"
@@ -260,6 +267,7 @@ class hsIndividualRandom:
         return header + body
 
     def runOptModel(self, parent, way):
+        """主要的仿真/求解环路。"""
         parent, way = self._normalize_inputs(parent, way)
         meta = self._pick_scales(parent, way)
         code = self._build_objective_code(**meta)
