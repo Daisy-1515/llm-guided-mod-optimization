@@ -17,71 +17,33 @@
 
 ## 当前状态
 
-**更新时间**: 2026-03-30 06:15:00
+**更新时间**: 2026-03-30 21:35:00
 
 ### 项目进度
 
-- **Phase Status**: Phase⑦ 补救 — L1 输出层完整性修复完成
-- **最新稳定提交**: `9c78066` `refactor(structure): move entry scripts out of repo root`
-- **最新文档提交**: `5cd9499` `docs(diag): move Phase4 diagnostic guide into audit docs`
+- **Phase Status**: Phase⑧ 完成 — 代码-文档对齐与归档整合
+- **最新稳定提交**: `daffa90` `Phase⑧: Complete code-documentation alignment & archival structure`
 - **最新实验提交**: `c740745` `fix(l1-constraint): resolve L1-C2 asymmetry and add failure mode support`
-- **当前补救提交**: Phase⑦ 补救 — getOutputs() 扩展 + 3 个单元测试 + 1 个集成回归测试
+
+### Phase⑧ 完成摘要（2026-03-30）
+
+**代码-文档一致性对齐与归档整合**：
+
+1. **一致性验证**：代码-文档对齐评级 A+（98%）
+2. **归档整理**：29 个不活跃文档归档至 7 个 archive 目录
+3. **活跃文档更新**：4 个文档更新（+104 行），确保与当前代码同步
+4. **分离统计指标**：5 个实验验证全部通过
+5. **修改统计**：42 文件变更，+1499 行
+
+**已知遗留问题**：
+- `evaluator.py` 的 `drop` 字段兼容性问题（evaluation_score=1e12 罚分触发）
 
 ### 当前代码结构结论
 
 - 根目录业务 Python 入口已清理，当前根目录仅保留项目级文件和 `__init__.py`
 - 可执行入口统一迁移到 [`scripts/`](scripts)
 - 原始 MoD 共享模块迁移到 [`legacy_mod/`](legacy_mod)
-- `PHASE4_DIAGNOSTIC_GUIDE.md` 已迁移到 [`文档/40_审查与诊断/Phase4_诊断指南_2026-03-27.md`](文档/40_审查与诊断/Phase4_诊断指南_2026-03-27.md)
-
-### 最新运行/实验结论 (Phase⑦ Step2 - 2026-03-29)
-
-**Full-Time Task Activation Experiment (全时段激活)**
-
-实验目标：扩展任务活跃时间（10-15 → 30 时隙）以扩大 LLM 优化空间
-
-**结果**：❌ 方案**完全失效**
-- 小规模 (15t×3u): A = 944.19, D1 = 944.19 → **0% 改进**
-- 中规模 (20t×5u): A = 944.19, D1 = 944.19 → **0% 改进**
-
-**根本原因**：
-- ✅ 配置成功应用（active_window_min/max = 30 已确认）
-- ❌ D1 目标函数在该参数配置下已达**局部/全局最优**
-- ❌ 问题不在约束强度，而在**目标函数本身**
-
-**后续方向**：
-1. 验证 D1 的理论最优性（LP 松弛分析）
-2. 调整模型权重（alpha, gamma_w, lambda_w）
-3. 重新设计目标函数权重分配
-4. 保留全时段配置供后续参数调整使用
-
-### Phase⑦ 补救 — L1 输出层完整性修复（2026-03-30）
-
-**修复内容**：
-1. **getOutputs() 扩展**：新增 `drop` 字段返回被强制丢弃的任务列表
-2. **模型层单测**：3 个精准验证测试
-   - `test_drop_creation_exact`：验证 drop 仅在本地+卸载都超期时创建
-   - `test_failure_penalty_coefficient`：验证罚项系数与成本差精确对应
-   - `test_local_feasible_boundary`：验证本地可行性边界条件（D_hat_local <= tau）
-3. **BCD 集成回归**：1 个验证新输出格式兼容性的测试
-   - `test_output_schema_compatibility`：验证新 drop 字段不破坏 validate_offloading_outputs()
-
-**测试结果**：✅ 全 4 个测试通过
-
-**完成后状态**：
-- ✓ Level 1 solver-side 链路（约束→目标→输出）完整度：95% → 95.5%（仅约束层）
-- ✓ Level 1 预计算诊断初版可用
-- ✓ 新输出格式向后兼容，Level 2 验证和评分链路保持原样
-
-**不在本次**：
-- Level 2 验证和评分链路改造（后续专项）
-- 诊断字段深化（按需）
-
-### 当前工作区状态
-
-- 当前应以文档同步和结构清理为主，不应长期保留未提交改动
-- 若 `endday` 运行后仍残留文档改动，优先检查 `.endday.env` 的 `STAGE_PATTERNS` 是否覆盖 `文档/配置指南.md` 和 `文档/60_规划草案/`
-- 当前推荐在收尾前用 `git status --short` 再核对一次暂存范围
+- 不活跃文档统一归档至各目录下的 `archive/` 子目录
 
 ---
 
@@ -121,6 +83,13 @@ uv run pytest tests -v
 
 ## 近期重要变更
 
+### 2026-03-30
+
+- Phase⑧ 完成：代码-文档一致性对齐与归档整合（`daffa90`）
+- 29 个不活跃文档归档至 7 个 archive 目录
+- 4 个活跃文档更新（+104 行）
+- 5 个分离统计指标实验验证通过
+
 ### 2026-03-28
 
 - 新增 [`scripts/run_all_experiments.py`](scripts/run_all_experiments.py)，用于批量实验
@@ -133,9 +102,9 @@ uv run pytest tests -v
 
 ## 下次开始建议
 
-1. 若继续使用 `endday`，优先验证文档类改动是否都能被自动纳入暂存
-2. 若要彻底消除 Windows 下的乱码尾错，单独修复 `endday` skill 的 subprocess 编码处理
-3. 若继续实验，统一使用 `scripts/` 下入口，避免再新增根目录脚本
+1. 修复 `evaluator.py` 的 `drop` 字段兼容性（evaluation_score=1e12 罚分问题）
+2. 运行完整规模 HS 实验，验证 LLM 引导优化效果
+3. 分析诊断指标趋势，评估目标函数多样性
 
 ---
 
