@@ -9,23 +9,19 @@
 这个脚本分离统计，以及查看每个未分配对的实际可行性（如果赋予合理 f_edge）。
 """
 
-import sys
-from pathlib import Path
+import math
 
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
+from script_common import ROOT, load_config, make_edge_uav_scenario
 
 from edge_uav.model.precompute import precompute_offloading_inputs, _offload_delay
 from edge_uav.model.scenario import EdgeUavScenario
-from llmAPI.config.config import Params
-import math
+from config.config import configPara
 
 
 def diagnose_feasibility(
     scenario: EdgeUavScenario,
     snapshot,
-    params: Params,
+    params: configPara,
     seed: int = None,
 ):
     """
@@ -209,15 +205,13 @@ def diagnose_feasibility(
 
 
 if __name__ == "__main__":
-    from edge_uav.scenario_builder import build_scenario_from_config
-    from llmAPI.config.config import get_default_params
-
-    # 加载一个最近的运行结果
     import json
-    from datetime import datetime
 
-    # 尝试找一个最近的 seed=42 或 seed=44 运行结果
-    discussion_dir = project_root / "discussion"
+    params = load_config()
+    scenario = make_edge_uav_scenario(params)
+
+    # 尝试找一个最近的运行结果
+    discussion_dir = ROOT / "discussion"
     if discussion_dir.exists():
         runs = sorted(discussion_dir.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
         if runs:

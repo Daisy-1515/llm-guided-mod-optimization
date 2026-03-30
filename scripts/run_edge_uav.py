@@ -1,10 +1,10 @@
-﻿"""Edge UAV 入口脚本，功能与 testAll.py 对应。
+﻿"""Edge UAV 入口脚本，功能与 run_all.py 对应。
 
 用法:
-    .venv/Scripts/python scripts/testEdgeUav.py
+    uv run python scripts/run_edge_uav.py
 
 环境变量覆盖 (Override):
-    HS_POP_SIZE=1 HS_ITERATION=1 .venv/Scripts/python scripts/testEdgeUav.py
+    HS_POP_SIZE=1 HS_ITERATION=1 uv run python scripts/run_edge_uav.py
 """
 
 import os
@@ -19,8 +19,8 @@ def main():
     params.popSize = int(os.environ.get("HS_POP_SIZE", params.popSize))
     params.iteration = int(os.environ.get("HS_ITERATION", params.iteration))
 
-    print(f"[testEdgeUav] model={params.llmModel}, endpoint={params.api_endpoint}")
-    print(f"[testEdgeUav] popSize={params.popSize}, iteration={params.iteration}")
+    print(f"[run_edge_uav] model={params.llmModel}, endpoint={params.api_endpoint}")
+    print(f"[run_edge_uav] popSize={params.popSize}, iteration={params.iteration}")
 
     # 检查 LLM API 相关的关键配置是否完整
     if not params.api_key or not params.api_endpoint:

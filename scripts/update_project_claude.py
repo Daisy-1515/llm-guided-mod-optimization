@@ -94,7 +94,7 @@ class ProjectClaudeUpdater:
 
 ```bash
 uv sync                      # 环境设置
-python scripts/testEdgeUav.py        # 运行 Edge UAV 管道
+python scripts/run_edge_uav.py        # 运行 Edge UAV 管道
 python scripts/analyze_results.py    # 验证结果
 pytest tests/ -v             # 运行全部测试
 ```
@@ -135,7 +135,7 @@ iteration = 10
 
 ### 运行完整管道
 ```bash
-python scripts/testEdgeUav.py --popsize=5 --iteration=10
+python scripts/run_edge_uav.py --popsize=5 --iteration=10
 python scripts/analyze_results.py --run-dir discussion/LATEST_RUN/
 ```
 

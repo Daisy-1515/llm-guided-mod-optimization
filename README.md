@@ -46,14 +46,14 @@ model = qwen3.5-plus
 ### Common Commands
 
 ```bash
-uv run python scripts/testEdgeUav.py
-HS_POP_SIZE=3 HS_ITERATION=5 uv run python scripts/testEdgeUav.py
+uv run python scripts/run_edge_uav.py
+HS_POP_SIZE=3 HS_ITERATION=5 uv run python scripts/run_edge_uav.py
 uv run pytest tests -v
 uv run python scripts/run_all_experiments.py --help
 uv run python scripts/check_llm_api.py
 ```
 
-- `scripts/testEdgeUav.py`: main Edge-UAV entrypoint
+- `scripts/run_edge_uav.py`: main Edge-UAV entrypoint
 - `scripts/run_all_experiments.py`: batch experiment runner
 - `scripts/check_llm_api.py`: connectivity check for the configured LLM endpoint
 - `pytest tests -v`: unit and integration tests
@@ -69,7 +69,7 @@ uv run python scripts/check_llm_api.py
 
 ## Runtime Flow
 
-1. `scripts/testEdgeUav.py` loads configuration and builds an `EdgeUavScenario`.
+1. `scripts/run_edge_uav.py` loads configuration and builds an `EdgeUavScenario`.
 2. `HarmonySearchSolver` manages the outer search loop.
 3. `hsIndividualEdgeUav` bridges the LLM or default objective into the solver stack.
 4. `offloading.py`, `resource_alloc.py`, `trajectory_opt.py`, and `bcd_loop.py` solve the main optimization blocks.
@@ -85,7 +85,7 @@ uv run python scripts/check_llm_api.py
 ## Legacy Note
 
 Historical MoD code is still present under `legacy_mod/`, `model/`, `prompt/`,
-`simulator/`, and `scripts/testAll.py`, but it is not the default development path.
+`simulator/`, and `scripts/run_all.py`, but it is not the default development path.
 
 ## License
 

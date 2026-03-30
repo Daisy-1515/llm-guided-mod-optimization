@@ -54,8 +54,8 @@
 uv sync
 
 # 主运行入口
-uv run python scripts/testEdgeUav.py
-uv run python scripts/testAll.py
+uv run python scripts/run_edge_uav.py
+uv run python scripts/run_all.py
 
 # 结果分析
 uv run python scripts/analyze_results.py --run-dir discussion/<run_id>
@@ -94,7 +94,7 @@ uv run pytest tests -v
 
 - 新增 [`scripts/run_all_experiments.py`](scripts/run_all_experiments.py)，用于批量实验
 - 将 `config/config.py` 中 `f_max` 默认值从 `5e9` 提高到 `1e10`
-- 移除 `testEdgeUav.py` 中运行前强制放宽 `tau` / `f_local` 的默认兜底逻辑
+- 移除 `run_edge_uav.py`（原 `testEdgeUav.py`）中运行前强制放宽 `tau` / `f_local` 的默认兜底逻辑
 - 将根目录入口和旧模块迁移到 `scripts/` 与 `legacy_mod/`
 - 将 Phase4 诊断指南迁移到审查与诊断文档目录
 
