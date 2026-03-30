@@ -14,11 +14,15 @@ from __future__ import annotations
 
 import pytest
 from copy import deepcopy
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
+from config.config import configPara
 from edge_uav.data import ComputeTask, UAV, EdgeUavScenario
-from edge_uav.model.precompute import Level2Snapshot
+from edge_uav.model.bcd_loop import run_bcd_loop
+from edge_uav.model.precompute import Level2Snapshot, PrecomputeParams, PrecomputeResult
+from edge_uav.model.trajectory_opt import TrajectoryOptParams, TrajectoryResult
 
 if TYPE_CHECKING:
     # Placeholder imports for bcd_loop module (to be implemented in Step4)
@@ -379,3 +383,110 @@ class TestBCDIntegration:
     def test_placeholder(self):
         """占位符，防止 pytest 报告 "无测试" 警告。"""
         assert True
+class TestBCDFinalDiagnostics:
+    """Integration tests for final diagnostics recomputation."""
+
+    def test_final_precompute_uses_best_snapshot_after_rollback_break(
+        self, simple_scenario: EdgeUavScenario, monkeypatch
+    ):
+        config = configPara(None, None)
+        params = PrecomputeParams.from_config(config)
+        traj_params = TrajectoryOptParams(
+            eta_1=float(config.eta_1),
+            eta_2=float(config.eta_2),
+            eta_3=float(config.eta_3),
+            eta_4=float(config.eta_4),
+            v_tip=float(config.v_tip),
+            v_max=float(config.v_traj_max),
+            d_safe=float(config.d_safe_traj),
+        )
+        initial_snapshot = _make_valid_snapshot(simple_scenario)
+        precompute_sources = []
+        trajectory_costs = iter([10.0, 20.0])
+
+        def fake_precompute_offloading_inputs(
+            scenario, params_arg, snapshot, mu=None, active_only=True
+        ):
+            precompute_sources.append(snapshot.source)
+            return PrecomputeResult(
+                D_hat_local={},
+                D_hat_offload={},
+                E_hat_comp={},
+                diagnostics={"snapshot_source": snapshot.source},
+            )
+
+        class FakeOffloadingModel:
+            def __init__(self, **kwargs):
+                self.gap = 0.0
+                self.error_message = ""
+
+            def solveProblem(self):
+                return None
+
+            def getOutputs(self):
+                return {
+                    t: {"local": [0], "offload": {0: []}}
+                    for t in simple_scenario.time_slots
+                }
+
+        def fake_solve_resource_allocation(*args, **kwargs):
+            return SimpleNamespace(
+                f_local={0: {t: 1.0 for t in simple_scenario.time_slots}},
+                f_edge={0: {0: {t: 1.0 for t in simple_scenario.time_slots}}},
+                total_comp_energy={0: 1.0},
+                diagnostics={"binding_slots": 0},
+            )
+
+        def fake_solve_trajectory_sca(*args, **kwargs):
+            q_new = {0: {t: (500.0, 500.0) for t in simple_scenario.time_slots}}
+            return TrajectoryResult(
+                q=q_new,
+                objective_value=next(trajectory_costs),
+                per_uav_energy={0: 1.0},
+                sca_iterations=1,
+                converged=False,
+                solver_status="optimal",
+                max_safe_slack=0.0,
+                diagnostics={},
+            )
+
+        def fake_check_trajectory_monotonicity(q_result, scenario, config):
+            return q_result.q, q_result.objective_value
+
+        monkeypatch.setattr(
+            "edge_uav.model.bcd_loop.precompute_offloading_inputs",
+            fake_precompute_offloading_inputs,
+        )
+        monkeypatch.setattr("edge_uav.model.bcd_loop.OffloadingModel", FakeOffloadingModel)
+        monkeypatch.setattr(
+            "edge_uav.model.bcd_loop.solve_resource_allocation",
+            fake_solve_resource_allocation,
+        )
+        monkeypatch.setattr(
+            "edge_uav.model.bcd_loop.solve_trajectory_sca",
+            fake_solve_trajectory_sca,
+        )
+        monkeypatch.setattr(
+            "edge_uav.model.bcd_loop.check_trajectory_monotonicity",
+            fake_check_trajectory_monotonicity,
+        )
+
+        result = run_bcd_loop(
+            simple_scenario,
+            config,
+            params,
+            traj_params,
+            dynamic_obj_func="def dynamic_obj_func(self):\n    return None",
+            initial_snapshot=initial_snapshot,
+            max_bcd_iter=3,
+            cost_rollback_delta=0.05,
+            max_rollbacks=1,
+        )
+
+        assert result.snapshot.source == "iteration_0"
+        assert precompute_sources == ["iteration_0", "iter0_post_adapt", "iteration_0"]
+        assert (
+            result.solution_details["final_precompute_diagnostics"]["snapshot_source"]
+            == "iteration_0"
+        )
+        assert result.solution_details["final_precompute_diagnostics_fallback"] is False

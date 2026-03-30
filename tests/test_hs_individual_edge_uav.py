@@ -128,7 +128,13 @@ def test_t4_bcd_recomputes_precompute_for_scoring(scenario_bundle, monkeypatch):
     final_precompute = type(
         "FakePrecompute",
         (),
-        {"diagnostics": {"offload_feasible_ratio": 0.5}},
+        {
+            "diagnostics": {
+                "offload_feasible_ratio": 0.5,
+                "assigned_pairs": 0,
+                "assigned_feasible_ratio": None,
+            }
+        },
     )()
 
     def fake_run_bcd_loop(**kwargs):
@@ -140,7 +146,9 @@ def test_t4_bcd_recomputes_precompute_for_scoring(scenario_bundle, monkeypatch):
             bcd_iterations=2,
             converged=True,
             cost_history=[12.34, 12.34],
-            solution_details={},
+            solution_details={
+                "final_precompute_diagnostics": final_precompute.diagnostics,
+            },
         )
 
     def fake_precompute_offloading_inputs(*args, **kwargs):
@@ -169,6 +177,11 @@ def test_t4_bcd_recomputes_precompute_for_scoring(scenario_bundle, monkeypatch):
     assert ind.promptHistory["evaluation_score"] == pytest.approx(7.89)
     step = ind.promptHistory["simulation_steps"]["0"]
     assert step["final_precompute_diagnostics"]["offload_feasible_ratio"] == 0.5
+    assert step["final_precompute_diagnostics"]["assigned_feasible_ratio"] is None
+    assert (
+        step["bcd_meta"]["solution_details"]["final_precompute_diagnostics"]
+        == step["final_precompute_diagnostics"]
+    )
 
 
 def test_t5_bcd_logs_solver_status_consistently(scenario_bundle, monkeypatch):

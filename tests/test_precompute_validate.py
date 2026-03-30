@@ -6,7 +6,7 @@
 import pytest
 
 from edge_uav.data import ComputeTask, UAV, EdgeUavScenario
-from edge_uav.model.precompute import Level2Snapshot
+from edge_uav.model.precompute import Level2Snapshot, _build_diagnostics
 
 
 # =====================================================================
@@ -333,3 +333,44 @@ class TestMultipleErrors:
         assert "q missing key" in msg
         assert "<= 0" in msg
         assert "out of bounds" in msg
+
+
+class TestSeparatedDiagnostics:
+    def test_assigned_feasible_ratio_is_none_when_no_pairs_are_assigned(self):
+        """assigned_pairs == 0 should be reported as None, not 0.0."""
+        scenario = _make_scenario()
+        zero_snapshot = Level2Snapshot(
+            q={0: {t: (500.0, 500.0) for t in scenario.time_slots}},
+            f_edge={
+                0: {
+                    i: {t: 0.0 for t in scenario.time_slots}
+                    for i in scenario.tasks
+                }
+            },
+            source="zero_alloc",
+        )
+
+        diagnostics = _build_diagnostics(
+            D_hat_local={0: {0: 1.0}, 1: {0: 1.0}},
+            D_hat_offload={
+                0: {0: {0: 2.0, 1: 2.0}},
+                1: {0: {0: 2.0, 1: 2.0}},
+            },
+            E_hat_comp={0: {0: {0: 0.0, 1: 0.0}, 1: {0: 0.0, 1: 0.0}}},
+            tasks=scenario.tasks,
+            snapshot_source="custom",
+            guard_hits={},
+            active_task_slots=2,
+            candidate_offload_pairs=4,
+            deadline_feasible_pairs=0,
+            uplink_rates=[1.0],
+            downlink_rates=[1.0],
+            tasks_all_uavs_infeasible=[],
+            tasks_local_over_tau=[],
+            snapshot=zero_snapshot,
+            eps_freq=1e-12,
+        )
+
+        assert diagnostics["assigned_pairs"] == 0
+        assert diagnostics["unassigned_pairs"] == 4
+        assert diagnostics["assigned_feasible_ratio"] is None
