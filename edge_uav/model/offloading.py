@@ -160,7 +160,7 @@ class OffloadingModel:
         返回
         -------
         dict
-            {t: {"local": [task_ids], "offload": {j: [task_ids]}}}
+            {t: {"local": [task_ids], "offload": {j: [task_ids]}, "drop": [task_ids]}}
         """
         result = {}
 
@@ -170,10 +170,12 @@ class OffloadingModel:
 
         X_local = self.model.getAttr("x", self.x_local)
         X_offload = self.model.getAttr("x", self.x_offload)
+        X_drop = self.model.getAttr("x", self.drop) if self.drop else {}
 
         for t in self.timeList:
             local_tasks = []
             offload_tasks = {j: [] for j in self.uavList}
+            drop_tasks = []
 
             for i in self.taskList:
                 if not self.task[i].active[t]:
@@ -181,13 +183,15 @@ class OffloadingModel:
 
                 if (i, t) in X_local and X_local[i, t] > 0.5:
                     local_tasks.append(i)
+                elif (i, t) in X_drop and X_drop[i, t] > 0.5:
+                    drop_tasks.append(i)
                 else:
                     for j in self.uavList:
                         if (i, j, t) in X_offload and X_offload[i, j, t] > 0.5:
                             offload_tasks[j].append(i)
                             break
 
-            result[t] = {"local": local_tasks, "offload": offload_tasks}
+            result[t] = {"local": local_tasks, "offload": offload_tasks, "drop": drop_tasks}
 
         return result
 

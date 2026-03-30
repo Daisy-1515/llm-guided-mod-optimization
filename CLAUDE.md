@@ -17,14 +17,15 @@
 
 ## 当前状态
 
-**更新时间**: 2026-03-29 23:32:24
+**更新时间**: 2026-03-30 06:15:00
 
 ### 项目进度
 
-- **Phase Status**: Phase⑦ Step2 全时段激活实验完成 — **方案失效**
+- **Phase Status**: Phase⑦ 补救 — L1 输出层完整性修复完成
 - **最新稳定提交**: `9c78066` `refactor(structure): move entry scripts out of repo root`
 - **最新文档提交**: `5cd9499` `docs(diag): move Phase4 diagnostic guide into audit docs`
-- **最近提交**: `94f01a8` `chore: enable full-time task activation (active_window 10-15 -> 30 slots)`
+- **最新实验提交**: `c740745` `fix(l1-constraint): resolve L1-C2 asymmetry and add failure mode support`
+- **当前补救提交**: Phase⑦ 补救 — getOutputs() 扩展 + 3 个单元测试 + 1 个集成回归测试
 
 ### 当前代码结构结论
 
@@ -53,6 +54,28 @@
 2. 调整模型权重（alpha, gamma_w, lambda_w）
 3. 重新设计目标函数权重分配
 4. 保留全时段配置供后续参数调整使用
+
+### Phase⑦ 补救 — L1 输出层完整性修复（2026-03-30）
+
+**修复内容**：
+1. **getOutputs() 扩展**：新增 `drop` 字段返回被强制丢弃的任务列表
+2. **模型层单测**：3 个精准验证测试
+   - `test_drop_creation_exact`：验证 drop 仅在本地+卸载都超期时创建
+   - `test_failure_penalty_coefficient`：验证罚项系数与成本差精确对应
+   - `test_local_feasible_boundary`：验证本地可行性边界条件（D_hat_local <= tau）
+3. **BCD 集成回归**：1 个验证新输出格式兼容性的测试
+   - `test_output_schema_compatibility`：验证新 drop 字段不破坏 validate_offloading_outputs()
+
+**测试结果**：✅ 全 4 个测试通过
+
+**完成后状态**：
+- ✓ Level 1 solver-side 链路（约束→目标→输出）完整度：95% → 95.5%（仅约束层）
+- ✓ Level 1 预计算诊断初版可用
+- ✓ 新输出格式向后兼容，Level 2 验证和评分链路保持原样
+
+**不在本次**：
+- Level 2 验证和评分链路改造（后续专项）
+- 诊断字段深化（按需）
 
 ### 当前工作区状态
 
