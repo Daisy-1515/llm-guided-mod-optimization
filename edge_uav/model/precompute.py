@@ -463,6 +463,8 @@ def precompute_offloading_inputs(
         downlink_rates=downlink_rates,
         tasks_all_uavs_infeasible=sorted(tasks_all_uavs_infeasible),
         tasks_local_over_tau=sorted(tasks_local_over_tau),
+        snapshot=snapshot,
+        eps_freq=params.eps_freq,
     )
 
     return PrecomputeResult(
@@ -643,8 +645,16 @@ def _build_diagnostics(
     downlink_rates: list[float],
     tasks_all_uavs_infeasible: list[int],
     tasks_local_over_tau: list[int],
+    snapshot: "Level2Snapshot | None" = None,
+    eps_freq: float = 1e-12,
 ) -> dict[str, Any]:
-    """汇总预计算统计信息与数值保护触发情况。"""
+    """汇总预计算统计信息与数值保护触发情况。
+
+    如提供 snapshot，会额外计算分离统计：
+    - 已分配对（f > eps_freq）的可行率
+    - 未分配对（f ≤ eps_freq）理论在 f_max 下的可行率
+    - 系统分配率
+    """
     local_values = [v for inner in D_hat_local.values() for v in inner.values()]
     offload_values = [
         v for i_dict in D_hat_offload.values()
@@ -657,7 +667,7 @@ def _build_diagnostics(
         for v in i_dict.values()
     ]
 
-    return {
+    result = {
         "snapshot_source": snapshot_source,
         "active_task_slots": active_task_slots,
         "candidate_offload_pairs": candidate_offload_pairs,
@@ -675,3 +685,58 @@ def _build_diagnostics(
         "tasks_all_uavs_infeasible": tasks_all_uavs_infeasible,
         "tasks_local_over_tau": tasks_local_over_tau,
     }
+
+    # ---- 分离统计：区分已分配对 vs 未分配对 ----
+    # 目的：区分两类诊断故障
+    #   1. 已分配对无法满足 deadline（真实 deadline 压力）
+    #   2. 未分配对（f_edge=0）导致时延爆炸（实现口径混淆）
+    #
+    # 定义：
+    #   - 已分配对：f_edge[j][i][t] > eps_freq（在 BCD 优化中被显式频率分配）
+    #   - 未分配对：f_edge[j][i][t] ≤ eps_freq（在 adapt_f_edge_for_snapshot 中填 0.0）
+    #
+    # 指标说明：
+    #   - assigned_pairs：总的已分配对数
+    #   - assigned_feasible_pairs：其中满足 deadline 的对数
+    #   - assigned_feasible_ratio：已分配可行率
+    #     * 若 assigned_pairs == 0，则为 None（无法计算比例）
+    #     * 若 assigned_pairs > 0，则为 assigned_feasible_pairs / assigned_pairs
+    #   - unassigned_pairs：未分配对数（f=0 后的虚假时延）
+    #   - assigned_pair_ratio：已分配对占总卸载候选对的比例
+    if snapshot is not None and D_hat_offload and tasks:
+        assigned_pairs = 0
+        assigned_feasible = 0
+        unassigned_pairs = 0
+
+        for i, task in tasks.items():
+            if i not in D_hat_offload:
+                continue
+            for j in D_hat_offload[i]:
+                for t in D_hat_offload[i][j]:
+                    f_val = float(snapshot.f_edge.get(j, {}).get(i, {}).get(t, 0.0))
+                    d_val = D_hat_offload[i][j][t]
+
+                    if f_val > eps_freq:
+                        # 已分配对（f > eps_freq）
+                        assigned_pairs += 1
+                        if d_val <= float(task.tau):
+                            assigned_feasible += 1
+                    else:
+                        # 未分配对（f ≤ eps_freq → 在 adapt_f_edge_for_snapshot 中被填 0.0）
+                        unassigned_pairs += 1
+
+        result["assigned_pairs"] = assigned_pairs
+        result["assigned_feasible_pairs"] = assigned_feasible
+        # 关键修正：assigned_feasible_ratio = None 当 assigned_pairs == 0
+        # 原因：0.0 和 None 语义不同
+        #   - None 表示"无已分配对，无法计算可行率"（不做 deadline 压力判断）
+        #   - 0.0 表示"有已分配对但全部不可行"（即真实 deadline 压力很大）
+        result["assigned_feasible_ratio"] = (
+            assigned_feasible / assigned_pairs if assigned_pairs > 0 else None
+        )
+        result["unassigned_pairs"] = unassigned_pairs
+        result["assigned_pair_ratio"] = (
+            assigned_pairs / candidate_offload_pairs if candidate_offload_pairs > 0 else 0.0
+        )
+
+    return result

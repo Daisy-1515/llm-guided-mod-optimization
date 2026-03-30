@@ -60,10 +60,15 @@ def _run_pipeline(scenario, params, *, alpha=1.0, gamma_w=1.0):
 def _make_all_local_outputs(scenario):
     """构造全本地 outputs：所有 active 任务分配到 local。"""
     outputs = {}
+    first_active_slot = {}
+    for i, task in scenario.tasks.items():
+        first_active_slot[i] = next(
+            t for t in scenario.time_slots if task.active.get(t, False)
+        )
     for t in scenario.time_slots:
         local_tasks = [
-            i for i, task in scenario.tasks.items()
-            if task.active.get(t, False)
+            i for i, slot in first_active_slot.items()
+            if slot == t
         ]
         outputs[t] = {
             "local": local_tasks,

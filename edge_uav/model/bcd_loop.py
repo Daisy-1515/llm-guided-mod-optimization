@@ -483,6 +483,9 @@ def run_bcd_loop(
     used_default_obj = dynamic_obj_func is None
     objective_acceptance_status = "default_obj" if dynamic_obj_func is None else "unknown"
 
+    # 标记 BCD 收敛发生的迭代编号（用于区分最终诊断的来源）
+    converged_at_k = None
+
     # -------- BCD outer loop --------
     for k in range(max_bcd_iter):
         logger.info(f"BCD iteration {k + 1}/{max_bcd_iter}")
@@ -666,6 +669,7 @@ def run_bcd_loop(
             logger.info(f"Relative cost gap: {relative_gap:.6e} (threshold: {eps_bcd})")
             if relative_gap < eps_bcd:
                 logger.info(f"BCD converged at iteration {k + 1}")
+                converged_at_k = k  # 记录收敛发生的迭代编号
                 break
         else:
             logger.debug("Skipping convergence check at iteration 0")
@@ -677,6 +681,41 @@ def run_bcd_loop(
         f"final cost={best_cost:.6f}, "
         f"converged={len(cost_history) < max_bcd_iter + 1}"
     )
+
+    # ---- 保存最终解的预计算诊断数据 ----
+    # 语义：final_precompute_diagnostics 应该反映 best_snapshot 的诊断
+    # 数据流：
+    #   1. BCD 每轮迭代开头调用 precompute_offloading_inputs(current_snapshot)
+    #      → precompute_result（仅是该轮初始快照的诊断，不是最终解）
+    #   2. BCD 迭代过程中更新 best_snapshot 及 best_cost
+    #   3. 收敛检查通过或达到最大迭代时，best_snapshot 是最终解快照
+    #   4. 需要重新计算 precompute_result(best_snapshot) 以获得最终解的诊断
+    #
+    # 处理逻辑：
+    #   - 若收敛（converged_at_k is not None）：重新计算最终诊断
+    #   - 若未收敛（达到最大迭代）：使用最后一轮的预计算结果（向下兼容）
+    try:
+        if converged_at_k is not None:
+            # 收敛情况：重新计算以确保诊断基于收敛后的最终解
+            logger.debug(
+                f"BCD converged at k={converged_at_k}. "
+                f"Recomputing final_precompute_diagnostics using best_snapshot."
+            )
+            final_precompute_result = precompute_offloading_inputs(
+                scenario, params, best_snapshot, active_only=True
+            )
+            solution_details["final_precompute_at_convergence"] = final_precompute_result.diagnostics
+            solution_details["final_precompute_diagnostics"] = final_precompute_result.diagnostics
+        elif 'precompute_result' in locals() and precompute_result is not None:
+            # 未收敛（达到最大迭代）：使用最后一轮的预计算结果
+            solution_details["final_precompute_diagnostics"] = precompute_result.diagnostics
+    except Exception as e:
+        logger.warning(
+            f"Failed to compute final_precompute_diagnostics: {e}. "
+            f"Falling back to last precompute_result if available."
+        )
+        if 'precompute_result' in locals() and precompute_result is not None:
+            solution_details["final_precompute_diagnostics"] = precompute_result.diagnostics
 
     return BCDResult(
         snapshot=best_snapshot,

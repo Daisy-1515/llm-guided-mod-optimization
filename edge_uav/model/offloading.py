@@ -242,18 +242,21 @@ class OffloadingModel:
 
         # (L1-C1) 唯一分配：每个活跃任务 → 本地或某一 UAV
         for i in self.taskList:
-            for t in self.timeList:
-                if not self.task[i].active[t]:
-                    continue
-                offload_sum = gb.quicksum(
-                    self.x_offload[i, j, t]
-                    for j in self.uavList
-                    if (i, j, t) in self.x_offload
-                )
-                self.model.addConstr(
-                    self.x_local[i, t] + offload_sum == 1,
-                    name=f"C1_assign_{i}_{t}",
-                )
+            local_sum = gb.quicksum(
+                self.x_local[i, t]
+                for t in self.timeList
+                if (i, t) in self.x_local
+            )
+            offload_sum = gb.quicksum(
+                self.x_offload[i, j, t]
+                for j in self.uavList
+                for t in self.timeList
+                if (i, j, t) in self.x_offload
+            )
+            self.model.addConstr(
+                local_sum + offload_sum == 1,
+                name=f"C1_assign_once_{i}",
+            )
 
         # (L1-C3) 可选 UAV 每时隙承载量上限
         for j in self.uavList:

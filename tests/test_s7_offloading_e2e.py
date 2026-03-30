@@ -80,22 +80,17 @@ def _local_count(outputs):
     return sum(len(slot["local"]) for slot in outputs.values())
 
 
-def _active_count(scenario):
+def _task_count(scenario):
     """统计场景中活跃 (i, t) 对数。"""
-    return sum(
-        1 for task in scenario.tasks.values()
-        for t in scenario.time_slots
-        if task.active.get(t, False)
-    )
+    return len(scenario.tasks)
 
 
 def _all_local_cost(result, scenario):
     """假设全本地执行时的归一化时延总成本 (alpha=1)。"""
     return sum(
-        result.D_hat_local[i][t] / scenario.tasks[i].tau
+        result.D_hat_local[i][next(t for t in scenario.time_slots if task.active.get(t, False))]
+        / scenario.tasks[i].tau
         for i, task in scenario.tasks.items()
-        for t in scenario.time_slots
-        if task.active.get(t, False)
     )
 
 
@@ -124,9 +119,9 @@ def test_a_baseline_all_local(scenario_bundle):
         f"degenerate path: offload_feasible_ratio should be 0, " \
         f"got {result.diagnostics['offload_feasible_ratio']}"
     # A3
-    n_active = _active_count(scenario)
+    n_tasks = _task_count(scenario)
     n_local = _local_count(outputs)
-    assert n_local == n_active, f"expected {n_active} local, got {n_local}"
+    assert n_local == n_tasks, f"expected {n_tasks} local, got {n_local}"
     # A4
     offloaded = _offloaded_triples(outputs)
     assert len(offloaded) == 0, f"expected 0 offloaded, got {len(offloaded)}"
@@ -208,9 +203,9 @@ def test_c_mixed_decisions(scenario_bundle):
     assert n_local > 0, "should have at least one local decision"
     assert len(offloaded) > 0, "should have at least one offload decision"
     # C3
-    n_active = _active_count(scenario)
-    assert n_local + len(offloaded) == n_active, \
-        f"total {n_local + len(offloaded)} != active {n_active}"
+    n_tasks = _task_count(scenario)
+    assert n_local + len(offloaded) == n_tasks, \
+        f"total {n_local + len(offloaded)} != tasks {n_tasks}"
 
 
 # =====================================================================
