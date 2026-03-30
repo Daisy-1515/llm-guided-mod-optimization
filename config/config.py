@@ -130,6 +130,7 @@ class configPara:
         self.alpha = 1.0        # 时延权重
         self.gamma_w = 1.0      # 计算能耗权重
         self.lambda_w = 1.0     # 飞行能耗权重
+        self.penalty_drop = 1e4  # 任务失败惩罚系数（对应无可行位置的任务）
 
         self.default_obj = """
 def dynamic_obj_func(self): 
@@ -288,6 +289,7 @@ def dynamic_obj_func(self):
         self.alpha = self.get_config_value('edgeUavWeights', 'alpha', self.alpha, cast=float)
         self.gamma_w = self.get_config_value('edgeUavWeights', 'gamma_w', self.gamma_w, cast=float)
         self.lambda_w = self.get_config_value('edgeUavWeights', 'lambda_w', self.lambda_w, cast=float)
+        self.penalty_drop = self.get_config_value('edgeUavWeights', 'penalty_drop', self.penalty_drop, cast=float)
 
         # 任务生成参数
         self.D_l_min = self.get_config_value('edgeUavTask', 'D_l_min', self.D_l_min, cast=float)

@@ -739,4 +739,15 @@ def _build_diagnostics(
             assigned_pairs / candidate_offload_pairs if candidate_offload_pairs > 0 else 0.0
         )
 
+    # ---- 新增 2026-03-30：(i,t) 级可行性网格 ----
+    # 初版最小化：仅本地可行性 bool，供 BCD 循环快速查询
+    per_slot_feasibility = {}
+    for i, task in tasks.items():
+        if i in D_hat_local:
+            for t in D_hat_local[i]:
+                local_feasible = D_hat_local[i][t] <= float(task.tau)
+                per_slot_feasibility[f"{i}_{t}"] = local_feasible
+
+    result["per_slot_feasibility"] = per_slot_feasibility
+
     return result
