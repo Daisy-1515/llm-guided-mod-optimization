@@ -1,231 +1,93 @@
-<div align="center">
-<h1>Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems</h1>
-<p><strong>LLM + Mathematical Optimization</strong></p>
-</div>
+﻿# Edge-UAV Joint Optimization
 
-[Paper Link](https://arxiv.org/pdf/2510.10644)
+This repository is currently maintained as an Edge-UAV joint optimization workspace.
+The active workflow combines:
 
-## What This Repo Is
+1. `LLM` for objective proposal or prompt evolution
+2. `Harmony Search` for population-based search
+3. `Mathematical optimization` for feasible offloading, resource allocation, and trajectory decisions
 
-This repository studies how to combine large language models with mathematical optimization for mobility-on-demand systems.
+The main path in daily use is the Edge-UAV pipeline under `scripts/`, `edge_uav/`,
+`heuristics/`, and `tests/`.
 
-It currently contains two parallel tracks:
+Current project status is tracked in [CLAUDE.md](./CLAUDE.md).
+Detailed design and audit material is indexed in [文档/INDEX.md](./文档/INDEX.md).
 
-- The original MoD pipeline for hierarchical optimization.
-- The Edge-UAV adaptation, where task offloading, resource allocation, and UAV trajectory planning are optimized jointly.
+## Quick Start
 
-> Status note (2026-03-27): current project-level status is maintained in `CLAUDE.md`.
-> Historical plans and diagnostic reports under `plans/` and `文档/40_审查与诊断/`
-> may describe earlier pre-integration stages. For the latest Phase⑥ Step4 progress,
-> see `CLAUDE.md` and `文档/70_工作日记/2026-03-27.md`.
-
-If you only need the shortest possible mental model:
-
-1. The LLM proposes or evolves high-level objective logic.
-2. Harmony Search mutates and selects prompts/objectives.
-3. The optimizer enforces hard constraints and produces feasible operational decisions.
-
-## Progressive Disclosure
-
-This README is organized from shallow to deep. Stop at the first level that answers your question.
-
-### Level 0: 5-Minute Overview
-
-Read this section if you only want to know whether this repository is relevant.
-
-- Problem: dynamic mobility optimization under demand-supply imbalance.
-- Core idea: use an LLM where objective design is hard, but keep feasibility under a mathematical optimizer.
-- Main method: a three-layer architecture combining prompt evolution, optimization, and simulation feedback.
-- Paper: [arXiv PDF](https://arxiv.org/pdf/2510.10644)
-
-### Level 1: 10-Minute Getting Started
-
-Read this section if you want to install dependencies and run something.
-
-#### Prerequisites
+### Requirements
 
 - Python 3.11-3.12
-- Gurobi and a valid `gurobipy` license
-- An LLM API endpoint if you want to run the LLM-guided pipeline
+- `uv`
+- `gurobipy` with a valid Gurobi license
+- An LLM API endpoint if you want to run the LLM-guided path
 
-#### Environment Setup
-
-Recommended:
+### Environment
 
 ```bash
 uv sync
 ```
 
-The historical `dependencies.yml`-based conda setup is no longer bundled in this repository.
-
-#### Configure LLM Access
-
-Edit `config/env/.env`:
+Create `config/env/.env`:
 
 ```env
 HUGGINGFACE_ENDPOINT="https://your-endpoint/v1"
 HUGGINGFACEHUB_API_TOKEN="sk-your-api-key"
 ```
 
-Edit `config/setting.cfg`:
+Update `config/setting.cfg` if needed:
 
 ```ini
 [llmSettings]
 platform = HuggingFace
-model = glm-5
+model = qwen3.5-plus
 ```
 
-Notes:
-
-- The current factory path is `HuggingFace`, but it is used as an OpenAI-compatible chat-completions route.
-- If you switch providers or response formats, you may need to adjust request/response handling in `llmAPI/`.
-
-#### Common Commands
+### Common Commands
 
 ```bash
-uv run python scripts/testAll.py
 uv run python scripts/testEdgeUav.py
 HS_POP_SIZE=3 HS_ITERATION=5 uv run python scripts/testEdgeUav.py
 uv run pytest tests -v
+uv run python scripts/run_all_experiments.py --help
 uv run python scripts/check_llm_api.py
 ```
 
-- `uv run python scripts/testAll.py`: original MoD pipeline.
-- `uv run python scripts/testEdgeUav.py`: Edge-UAV pipeline.
-- `HS_POP_SIZE=3 HS_ITERATION=5 uv run python scripts/testEdgeUav.py`: override Harmony Search population and iteration via environment variables.
-- `uv run pytest tests -v`: unit and integration tests.
-- `uv run python scripts/check_llm_api.py`: quick validation of LLM connectivity.
+- `scripts/testEdgeUav.py`: main Edge-UAV entrypoint
+- `scripts/run_all_experiments.py`: batch experiment runner
+- `scripts/check_llm_api.py`: connectivity check for the configured LLM endpoint
+- `pytest tests -v`: unit and integration tests
 
-### Level 2: Architecture and Code Navigation
+## Repository Map
 
-Read this section if you want to modify code, debug behavior, or add new modules.
+- `scripts/`: runnable entrypoints and experiment helpers
+- `edge_uav/`: scenario data, prompts, and optimization blocks
+- `heuristics/`: Harmony Search framework and individual execution bridge
+- `config/`: runtime configuration and parameter loading
+- `tests/`: unit and integration tests for the active Edge-UAV workflow
+- `llmAPI/`: model interface layer
 
-#### Three-Layer Architecture
+## Runtime Flow
 
-1. `LLM as Meta-Objective Designer`
-2. `Harmony Search as Prompt Evolver`
-3. `Optimizer as Constraint Enforcer`
+1. `scripts/testEdgeUav.py` loads configuration and builds an `EdgeUavScenario`.
+2. `HarmonySearchSolver` manages the outer search loop.
+3. `hsIndividualEdgeUav` bridges the LLM or default objective into the solver stack.
+4. `offloading.py`, `resource_alloc.py`, `trajectory_opt.py`, and `bcd_loop.py` solve the main optimization blocks.
+5. `evaluator.py` computes the fixed `evaluation_score` used to compare solutions.
 
-#### Main Entry Points
+## More Context
 
-- `scripts/testAll.py`: original project entry.
-- `scripts/testEdgeUav.py`: Edge-UAV entry.
-- `scripts/check_llm_api.py`: API connectivity check.
-- `scripts/analyze_results.py`: result inspection and summary for both `discussion/<timestamp>/` and `discussion/experiment_results/<timestamp>/`.
+- [CLAUDE.md](./CLAUDE.md): current project status, recent experiment conclusions, and next-step notes
+- [文档/INDEX.md](./文档/INDEX.md): full documentation index
+- `discussion/`: single-run and batch experiment outputs
+- `scripts/diagnose_edge_uav_bcd.py`: narrow diagnostic runner for offloading feasibility and BCD impact
 
-#### High-Level Directory Map
+## Legacy Note
 
-- `llmAPI/`: LLM interface and provider-specific request/response logic.
-- `prompt/`: prompt templates and prompt evolution logic for the original pipeline.
-- `heuristics/`: Harmony Search framework and population evolution.
-- `model/`: original optimization models.
-- `legacy_mod/`: original MoD shared data structures and scenario generation.
-- `edge_uav/`: Edge-UAV data model, prompts, scenario generation, and optimization blocks.
-- `simulator/`: simulation and evaluation logic for the original pipeline.
-- `tests/`: unit and integration tests.
-- `文档/`: design notes, formula derivations, implementation plans, audits, and paper materials.
-
-### Level 3: Where To Read Next
-
-Read this section if you need targeted documentation instead of reading code directly.
-
-#### If you are new to the project
-
-- [文档导航_渐进式披露版](./文档/00_总览/文档导航_渐进式披露版.md)
-- [仿真参数说明_Simulation_Setup](./文档/00_总览/仿真参数说明_Simulation_Setup.md)
-- [project_structure_analysis](./文档/00_总览/project_structure_analysis.md)
-
-#### If you want the mathematical model
-
-- [公式与两层解耦整合版_最新版_2026-03-24](./文档/10_模型与公式/公式与两层解耦整合版_最新版_2026-03-24.md)
-- [公式20_两层解耦](./文档/10_模型与公式/公式20_两层解耦.md)
-- [底层变量清单](./文档/10_模型与公式/底层变量清单.md)
-- [图片变量映射分析](./文档/10_模型与公式/图片变量映射分析.md)
-
-#### If you want implementation plans
-
-- [场景生成器设计方案](./文档/20_架构与实现/场景生成器设计方案.md)
-- [precompute_analysis](./文档/20_架构与实现/precompute_analysis.md)
-- [Phase6_Step2_resource_alloc详细实施计划](./文档/20_架构与实现/Phase6_Step2_resource_alloc详细实施计划.md)
-- [Phase6_BCD循环实施计划](./文档/20_架构与实现/Phase6_BCD循环实施计划.md)
-
-#### If you want tests and diagnostics
-
-- [S7_e2e_test_plan](./文档/30_测试与执行/S7_e2e_test_plan.md)
-- [首次试跑计划_Phase5_pipeline](./文档/30_测试与执行/首次试跑计划_Phase5_pipeline.md)
-- [Phase5_LLM调用问题诊断报告](./文档/40_审查与诊断/Phase5_LLM调用问题诊断报告.md)
-- [代码清理审查报告_2026-03-23](./文档/40_审查与诊断/代码清理审查报告_2026-03-23.md)
-
-#### If you are writing the paper
-
-- [项目文档_MoD原始参考](./文档/50_论文材料/项目文档_MoD原始参考.md)
-- [chapter1/1_绪论](./文档/50_论文材料/chapter1/1_绪论.md)
-- [chapter3/3.1_系统架构](./文档/50_论文材料/chapter3/3.1_系统架构.md)
-- [chapter3/3.2_信道与通信模型](./文档/50_论文材料/chapter3/3.2_信道与通信模型.md)
-- [chapter3/3.3_任务卸载与边缘计算模型](./文档/50_论文材料/chapter3/3.3_任务卸载与边缘计算模型.md)
-- [chapter3/3.4_无人机轨迹与能耗模型](./文档/50_论文材料/chapter3/3.4_无人机轨迹与能耗模型.md)
-- [chapter3/3.5_联合优化问题建模](./文档/50_论文材料/chapter3/3.5_联合优化问题建模.md)
-
-## Method Overview
-
-<p align="center">
-  <img src="./image/unbalancedWorld.png" alt="Unbalanced world" style="width:80%; height:auto;">
-</p>
-
-<p align="center">
-  <img src="./image/workFlow.png" alt="Workflow" style="width:80%; height:auto;">
-</p>
-
-The method combines semantic search over objectives with rigorous operational optimization:
-
-- `LLM`: proposes strategic objective logic.
-- `Harmony Search`: explores the prompt/objective space.
-- `Optimizer + Simulator`: checks feasibility and measures actual performance.
-
-This design keeps the creative part soft and the constraint part hard.
-
-## Edge-UAV Adaptation
-
-The Edge-UAV branch targets computational task offloading from mobile devices to UAV-mounted edge servers.
-
-Its main decision blocks are:
-
-- Offloading decisions.
-- CPU frequency and resource allocation.
-- UAV trajectory planning.
-
-The intended decomposition is:
-
-1. Fix trajectory/resources and solve offloading.
-2. Fix offloading and optimize Level 2.
-3. Split Level 2 into resource allocation and trajectory optimization.
-
-Relevant code is mainly under `edge_uav/`, `heuristics/`, `config/`, and `tests/`.
-
-## Practical Notes
-
-- `Gurobi` is required for the binary optimization parts.
-- `config/env/.env` is not tracked by git and must be created locally.
-- Some LLM providers may require adapter changes in `llmAPI/`.
-- Results are typically written under `discussion/`.
-- Single-run HS outputs live under `discussion/<timestamp>/`.
-- Batch experiment outputs live under `discussion/experiment_results/<timestamp>/`.
+Historical MoD code is still present under `legacy_mod/`, `model/`, `prompt/`,
+`simulator/`, and `scripts/testAll.py`, but it is not the default development path.
 
 ## License
 
-This repository does not currently include a checked-in `LICENSE` file. Do not rely on this README section as a formal license grant until that file is restored.
-
-Some dependencies, especially Gurobi, require separate licenses.
-
-## Citation
-
-If you use this code in research, please cite:
-
-```bibtex
-@inproceedings{llm-guided-mod-optimization,
-  title={Hierarchical Optimization via LLM-Guided Objective Evolution for Mobility-on-Demand Systems},
-  author={Yi Zhang, Yushen Long, Yun Ni, Liping Huang, Xiaohong Wang, Jun Liu},
-  booktitle={Conference on Neural Information Processing Systems (NeurIPS)},
-  year={2025}
-}
-```
+This repository does not currently include a checked-in `LICENSE` file.
+Do not treat the repository as having an explicit license grant until that file exists.
