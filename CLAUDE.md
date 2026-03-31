@@ -17,13 +17,13 @@
 
 ## 当前状态
 
-**更新时间**: 2026-03-30 21:35:00
+**更新时间**: 2026-04-01
 
 ### 项目进度
 
 - **Phase Status**: Phase⑧ 完成 — 代码-文档对齐与归档整合
-- **最新稳定提交**: `daffa90` `Phase⑧: Complete code-documentation alignment & archival structure`
-- **最新实验提交**: `c740745` `fix(l1-constraint): resolve L1-C2 asymmetry and add failure mode support`
+- **最新稳定提交**: `2c53c0e` `refactor(L1): remove drop mechanism — pure cost1+cost2 objective`
+- **最新实验提交**: `2c53c0e` (同上)
 
 ### Phase⑧ 完成摘要（2026-03-30）
 
@@ -36,7 +36,9 @@
 5. **修改统计**：42 文件变更，+1499 行
 
 **已知遗留问题**：
-- `evaluator.py` 的 `drop` 字段兼容性问题（evaluation_score=1e12 罚分触发）
+- ~~`evaluator.py` 的 `drop` 字段兼容性问题~~ — **已修复**（2026-04-01，drop 机制完全移除）
+- `test_bcd_metadata_recorded` 键名不匹配（检查 `iterations`/`converged` 但实际为 `bcd_iterations`/`bcd_converged`）
+- `test_condition_t_equals_0_is_integer_comparison` 需要 LLM API 配置
 
 ### 当前代码结构结论
 
@@ -100,9 +102,16 @@ uv run pytest tests -v
 
 ---
 
+### 2026-04-01
+
+- Drop 机制完全移除：7 文件 +160/-348（`2c53c0e`）
+- L1 目标函数回退到纯 cost1+cost2，超时任务不再被丢弃
+- Codex 审查通过（PASS WITH NOTES）
+- 133 tests passed, 2 pre-existing failures
+
 ## 下次开始建议
 
-1. 修复 `evaluator.py` 的 `drop` 字段兼容性（evaluation_score=1e12 罚分问题）
+1. 修复 2 个 pre-existing 测试失败（`test_bcd_metadata_recorded` 键名、`test_condition_t_equals_0` LLM 依赖）
 2. 运行完整规模 HS 实验，验证 LLM 引导优化效果
 3. 分析诊断指标趋势，评估目标函数多样性
 
