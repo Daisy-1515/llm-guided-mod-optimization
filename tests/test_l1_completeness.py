@@ -1,19 +1,17 @@
-"""L1 Solver-Side 完整性测试 — Drop 字段补救
+"""L1 Solver 完整性测试 — 无 Drop 版本
 
-测试 4 个核心项：
-  T1. drop 创建条件 (test_drop_creation_exact)：drop 仅在本地和卸载都不可行时创建
-  T2. 罚项系数精确性 (test_failure_penalty_coefficient)：不同系数的成本差异验证
-  T3. 本地可行性边界 (test_local_feasible_boundary)：D_hat_local <= tau 的边界测试
-  T4. 输出格式兼容性 (test_output_schema_compatibility)：新格式不破坏验证函数
+测试核心项：
+  T1. 变量无条件创建 (test_vars_unconditional)：所有活跃 (i,t) 都有 x_local 和 x_offload
+  T2. 按 i 聚合约束 (test_assign_once_per_task)：每个任务恰好分配一次
+  T3. 输出格式无 drop (test_output_no_drop)：getOutputs 不含 drop 字段
+  T4. 超时任务仍被分配 (test_tight_deadline_still_assigned)：D > tau 的任务不被丢弃
 
-对应补救计划：补齐 Level 1 solver-side 输出层完整性
+对应变更：移除 drop 失败机制，回退到 9d562f2 语义 + 移除卸载过滤
 """
 
 from __future__ import annotations
 
 import pytest
-from copy import deepcopy
-from typing import TYPE_CHECKING
 
 from config.config import configPara
 from edge_uav.data import ComputeTask, UAV, EdgeUavScenario
@@ -21,13 +19,8 @@ from edge_uav.model.offloading import OffloadingModel
 from edge_uav.model.precompute import (
     Level2Snapshot,
     PrecomputeParams,
-    PrecomputeResult,
     precompute_offloading_inputs,
 )
-from edge_uav.model.bcd_loop import validate_offloading_outputs
-
-if TYPE_CHECKING:
-    pass
 
 
 # =====================================================================
@@ -45,22 +38,19 @@ def _make_initial_snapshot(scenario: EdgeUavScenario) -> Level2Snapshot:
     return Level2Snapshot(q=q, f_edge=f_edge, source="test_init")
 
 
-def _make_tight_scenario_for_drop() -> EdgeUavScenario:
-    """构造强制 drop 的场景：本地延迟超期，所有 UAV 卸载也超期
+def _make_tight_scenario() -> EdgeUavScenario:
+    """构造截止期非常紧张的场景（以前会 drop，现在应被正常分配）。
 
-    返回值：
-      - tasks[0]：截止期非常紧张 (tau=0.01s)
-      - uavs[0,1]：通信和卸载延迟都会超期
-      - time_slots=[0, 1]
+    tasks[0]：tau=0.01s，本地和卸载延迟都会超期，但仍应被分配。
     """
     tasks = {
         0: ComputeTask(
             index=0,
-            pos=(100.0, 200.0),  # 任务位置
-            D_l=1e6,  # 本地输入数据 (bits)
-            D_r=5e5,  # 卸载返回数据 (bits)
-            F=1e9,    # 计算量 (cycles)
-            tau=0.01,  # ⚠️ 非常紧张的截止期，迫使 drop
+            pos=(100.0, 200.0),
+            D_l=1e6,
+            D_r=5e5,
+            F=1e9,
+            tau=0.01,  # 非常紧张的截止期
             active={0: True, 1: True},
             f_local=1e9,
         ),
@@ -101,7 +91,7 @@ def _make_normal_scenario() -> EdgeUavScenario:
             D_l=1e6,
             D_r=5e5,
             F=1e9,
-            tau=5.0,  # 充足的截止期
+            tau=5.0,
             active={0: True, 1: True},
             f_local=1e9,
         ),
@@ -125,22 +115,9 @@ def _make_normal_scenario() -> EdgeUavScenario:
     )
 
 
-# =====================================================================
-# Test T1: drop 创建条件
-# =====================================================================
-
-
-def test_drop_creation_exact():
-    """验证 drop[i,t] 仅在"本地和卸载都不可行"时被创建
-
-    关键验证点：
-      1. drop 字典仅在 has_local=False 且 has_offload=[] 时创建键
-      2. 返回的 getOutputs() 中 drop 列表非空
-      3. 同一 (i,t) 不会同时出现在 local 和 drop 中
-    """
-    scenario = _make_tight_scenario_for_drop()
+def _build_model(scenario):
+    """构建 OffloadingModel 并返回 (model, precompute_result)"""
     config = configPara(None, None)
-
     params = PrecomputeParams.from_config(config)
     snapshot = _make_initial_snapshot(scenario)
     precompute_result = precompute_offloading_inputs(scenario, params, snapshot)
@@ -155,218 +132,130 @@ def test_drop_creation_exact():
         alpha=config.alpha,
         gamma_w=config.gamma_w,
     )
-    model.penalty_drop = config.penalty_drop
+    return model, precompute_result
+
+
+# =====================================================================
+# Test T1: 变量无条件创建
+# =====================================================================
+
+
+def test_vars_unconditional():
+    """所有活跃 (i,t) 都应有 x_local 变量，所有活跃 (i,j,t) 都应有 x_offload 变量。"""
+    scenario = _make_tight_scenario()
+    model, _ = _build_model(scenario)
     model.initModel()
     model.setupVars()
 
-    # ✅ Assertion 1: drop 字典应该被创建且非空
-    assert model.drop is not None, "drop 字典应被初始化"
-    assert len(model.drop) > 0, "tight 场景应该产生至少一个 drop 键"
+    for i in model.taskList:
+        for t in model.timeList:
+            if model.task[i].active[t]:
+                assert (i, t) in model.x_local, \
+                    f"x_local[{i},{t}] 应无条件创建"
+                for j in model.uavList:
+                    assert (i, j, t) in model.x_offload, \
+                        f"x_offload[{i},{j},{t}] 应无条件创建"
 
-    # 求解
+    # 确认无 drop 属性或 drop 为空
+    assert not hasattr(model, 'drop') or not model.drop, \
+        "不应有 drop 变量"
+
+
+# =====================================================================
+# Test T2: 按 i 聚合约束（每个任务恰好分配一次）
+# =====================================================================
+
+
+def test_assign_once_per_task():
+    """求解后，每个任务在所有时隙中恰好出现在一个位置。"""
+    scenario = _make_normal_scenario()
+    model, _ = _build_model(scenario)
+    feasible, cost = model.solveProblem()
+
+    assert feasible, "常规场景应可行"
+    outputs = model.getOutputs()
+
+    # 统计每个任务被分配的次数
+    for i in scenario.tasks:
+        count = 0
+        for t in outputs:
+            if i in outputs[t]["local"]:
+                count += 1
+            for j in outputs[t]["offload"]:
+                if i in outputs[t]["offload"][j]:
+                    count += 1
+        assert count == 1, f"任务 {i} 应恰好分配 1 次，实际 {count} 次"
+
+
+# =====================================================================
+# Test T3: 输出格式无 drop
+# =====================================================================
+
+
+def test_output_no_drop():
+    """getOutputs 返回的字典不应包含 'drop' 字段。"""
+    scenario = _make_normal_scenario()
+    model, _ = _build_model(scenario)
     feasible, cost = model.solveProblem()
     outputs = model.getOutputs()
 
-    # ✅ Assertion 2: 检查输出格式
-    for t in outputs.keys():
-        assert "drop" in outputs[t], f"时隙 {t} 缺少 'drop' 字段"
-        assert isinstance(outputs[t]["drop"], list), f"时隙 {t} 的 drop 应为列表"
-
-    # ✅ Assertion 3: 验证同一 (i,t) 不会同时在 local 和 drop 中
-    for t in outputs.keys():
-        local_set = set(outputs[t]["local"])
-        drop_set = set(outputs[t]["drop"])
-        assert len(local_set & drop_set) == 0, \
-            f"时隙 {t}：local 和 drop 集合应不相交，找到重复 {local_set & drop_set}"
-
-    # ✅ Assertion 4: tight 场景至少应有一个 drop
-    has_drop = any(len(outputs[t]["drop"]) > 0 for t in outputs.keys())
-    assert has_drop, "tight 场景应产生至少一个被 drop 的任务"
+    for t in outputs:
+        assert "drop" not in outputs[t], \
+            f"时隙 {t} 不应包含 'drop' 字段"
+        assert "local" in outputs[t]
+        assert "offload" in outputs[t]
 
 
 # =====================================================================
-# Test T2: 罚项系数精确性
+# Test T4: 超时任务仍被分配（不被丢弃）
 # =====================================================================
 
 
-def test_failure_penalty_coefficient():
-    """验证目标函数中 drop 项的系数精确等于 penalty_drop
+def test_tight_deadline_still_assigned():
+    """即使 D > tau（超时），任务仍应被分配到某个位置。
 
-    方法：在强制-drop 场景中，比较两个不同 penalty_drop 值的成本差异
-    差异应该 ≈ (penalty_drop_2 - penalty_drop_1) × drop_count
+    超时通过 D/τ > 1 自然反映在目标值中，不应被 drop。
     """
-    scenario = _make_tight_scenario_for_drop()
-    config = configPara(None, None)
-
-    params = PrecomputeParams.from_config(config)
-    snapshot = _make_initial_snapshot(scenario)
-    precompute_result = precompute_offloading_inputs(scenario, params, snapshot)
-
-    # ======= 求解 A：penalty_drop = 1000 =======
-    model_a = OffloadingModel(
-        tasks=scenario.tasks,
-        uavs=scenario.uavs,
-        time_list=scenario.time_slots,
-        D_hat_local=precompute_result.D_hat_local,
-        D_hat_offload=precompute_result.D_hat_offload,
-        E_hat_comp=precompute_result.E_hat_comp,
-        alpha=config.alpha,
-        gamma_w=config.gamma_w,
-    )
-    model_a.penalty_drop = 1000
-    model_a.initModel()
-    model_a.setupVars()
-    feasible_a, cost_a = model_a.solveProblem()
-    outputs_a = model_a.getOutputs()
-
-    # 计数 drop 任务
-    drop_count_a = sum(len(outputs_a[t]["drop"]) for t in outputs_a.keys())
-
-    # ======= 求解 B：penalty_drop = 2000 =======
-    model_b = OffloadingModel(
-        tasks=scenario.tasks,
-        uavs=scenario.uavs,
-        time_list=scenario.time_slots,
-        D_hat_local=precompute_result.D_hat_local,
-        D_hat_offload=precompute_result.D_hat_offload,
-        E_hat_comp=precompute_result.E_hat_comp,
-        alpha=config.alpha,
-        gamma_w=config.gamma_w,
-    )
-    model_b.penalty_drop = 2000
-    model_b.initModel()
-    model_b.setupVars()
-    feasible_b, cost_b = model_b.solveProblem()
-    outputs_b = model_b.getOutputs()
-
-    drop_count_b = sum(len(outputs_b[t]["drop"]) for t in outputs_b.keys())
-
-    # ======= 验证：成本差异 ≈ 系数差 × drop_count =======
-    if drop_count_a > 0 or drop_count_b > 0:
-        actual_cost_diff = cost_b - cost_a
-        # 期望差异 = (penalty_drop_b - penalty_drop_a) × drop_count
-        # 由于不同求解，drop_count 可能略变化，我们用平均值
-        avg_drop_count = (drop_count_a + drop_count_b) / 2.0
-        expected_cost_diff = (2000 - 1000) * avg_drop_count
-
-        # 允许 ±10% 的浮点误差（目标函数不仅包含 drop，还有其他项）
-        tolerance = abs(expected_cost_diff) * 0.1 if expected_cost_diff != 0 else 10.0
-        assert abs(actual_cost_diff - expected_cost_diff) < tolerance, \
-            f"系数差异检查失败：期望差 {expected_cost_diff:.2f}，实际 {actual_cost_diff:.2f}，偏差 {actual_cost_diff - expected_cost_diff:.2f}"
-
-
-# =====================================================================
-# Test T3: 本地可行性边界
-# =====================================================================
-
-
-def test_local_feasible_boundary():
-    """验证 _local_feasible 的边界：D_local == tau 时应 True，> tau 时应 False
-
-    关键验证点：
-      1. 当 D_hat_local[i][t] <= tau 时，_local_feasible 返回 True
-      2. 当 D_hat_local[i][t] > tau 时，_local_feasible 返回 False
-      3. 边界情况 (== tau) 应返回 True（充要条件）
-    """
-    scenario = _make_normal_scenario()
-    config = configPara(None, None)
-
-    params = PrecomputeParams.from_config(config)
-    snapshot = _make_initial_snapshot(scenario)
-    precompute_result = precompute_offloading_inputs(scenario, params, snapshot)
-
-    model = OffloadingModel(
-        tasks=scenario.tasks,
-        uavs=scenario.uavs,
-        time_list=scenario.time_slots,
-        D_hat_local=precompute_result.D_hat_local,
-        D_hat_offload=precompute_result.D_hat_offload,
-        E_hat_comp=precompute_result.E_hat_comp,
-        alpha=config.alpha,
-        gamma_w=config.gamma_w,
-    )
-
-    # ✅ Assertion：直接调用 _local_feasible
-    task_id = 0
-    t = 0
-
-    # 获取预计算的 D_hat_local
-    d_local = precompute_result.D_hat_local[task_id][t]
-    tau_val = scenario.tasks[task_id].tau
-
-    result = model._local_feasible(task_id, t)
-
-    # 根据关系验证
-    if d_local <= tau_val:
-        assert result == True, \
-            f"D_hat_local[{task_id}][{t}]={d_local:.6f} <= tau={tau_val:.6f}，应返回 True，实际 {result}"
-    else:
-        assert result == False, \
-            f"D_hat_local[{task_id}][{t}]={d_local:.6f} > tau={tau_val:.6f}，应返回 False，实际 {result}"
-
-
-# =====================================================================
-# Test T4: 输出格式兼容性（BCD 集成回归）
-# =====================================================================
-
-
-def test_output_schema_compatibility():
-    """验证新的 getOutputs 返回格式（含 drop 字段）不破坏现有验证函数
-
-    关键验证点：
-      1. getOutputs() 返回包含 "drop" 字段的字典
-      2. validate_offloading_outputs() 能接受新格式（向后兼容）
-      3. 验证函数不会因新字段而抛异常
-    """
-    scenario = _make_normal_scenario()
-    config = configPara(None, None)
-
-    params = PrecomputeParams.from_config(config)
-    snapshot = _make_initial_snapshot(scenario)
-    precompute_result = precompute_offloading_inputs(scenario, params, snapshot)
-
-    model = OffloadingModel(
-        tasks=scenario.tasks,
-        uavs=scenario.uavs,
-        time_list=scenario.time_slots,
-        D_hat_local=precompute_result.D_hat_local,
-        D_hat_offload=precompute_result.D_hat_offload,
-        E_hat_comp=precompute_result.E_hat_comp,
-        alpha=config.alpha,
-        gamma_w=config.gamma_w,
-    )
-    model.penalty_drop = config.penalty_drop
-    model.initModel()
-    model.setupVars()
+    scenario = _make_tight_scenario()
+    model, _ = _build_model(scenario)
     feasible, cost = model.solveProblem()
+
+    assert feasible, "即使截止期紧张，模型仍应可行（无 drop 约束）"
 
     outputs = model.getOutputs()
 
-    # ✅ Assertion 1: 验证新格式
-    for t in outputs.keys():
-        assert "local" in outputs[t], f"时隙 {t} 缺少 'local' 字段"
-        assert "offload" in outputs[t], f"时隙 {t} 缺少 'offload' 字段"
-        assert "drop" in outputs[t], f"时隙 {t} 缺少 'drop' 字段"
-        assert isinstance(outputs[t]["drop"], list), "drop 字段应为列表"
+    # 每个任务都应被分配
+    for i in scenario.tasks:
+        assigned = False
+        for t in outputs:
+            if i in outputs[t]["local"]:
+                assigned = True
+                break
+            for j in outputs[t]["offload"]:
+                if i in outputs[t]["offload"][j]:
+                    assigned = True
+                    break
+            if assigned:
+                break
+        assert assigned, f"任务 {i} 应被分配（即使超时），不应被丢弃"
 
-    # ✅ Assertion 2: 验证函数兼容性（不应抛异常）
-    try:
-        validated = validate_offloading_outputs(outputs, scenario)
-        # validate_offloading_outputs 可能返回输出或 None；无论哪种都说明兼容
-        assert validated is None or validated == outputs, \
-            "验证函数应返回 None 或原输出"
-    except KeyError as e:
-        if "'drop'" in str(e):
-            pytest.fail(f"validate_offloading_outputs 不兼容新 drop 字段：{e}")
-        raise
-    except Exception as e:
-        pytest.fail(f"validate_offloading_outputs 在新格式上抛异常：{e}")
+    # 确认目标值 > 1（因为 D/tau > 1 对超时任务）
+    assert cost > 1.0, f"超时任务的目标值应 > 1，实际 {cost}"
 
 
 # =====================================================================
-# Entry point
+# Test T5: 本地可行性诊断方法仍可用
 # =====================================================================
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+def test_feasibility_methods_still_available():
+    """_offload_feasible 和 _local_feasible 方法仍应存在（用于诊断）。"""
+    scenario = _make_normal_scenario()
+    model, _ = _build_model(scenario)
+
+    assert hasattr(model, '_offload_feasible')
+    assert hasattr(model, '_local_feasible')
+
+    # 常规场景中，本地应可行
+    result = model._local_feasible(0, 0)
+    assert isinstance(result, bool)

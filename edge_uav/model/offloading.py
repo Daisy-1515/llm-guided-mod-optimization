@@ -85,14 +85,10 @@ class OffloadingModel:
         self.M = 100000
         self.gap = 0.05
 
-        # 失败惩罚系数（新增 2026-03-30）
-        self.penalty_drop = 1e4  # 默认值，会被调用方覆盖
-
         # 模型与决策变量（由 setupVars 填充）
         self.model = None
         self.x_local = {}
         self.x_offload = {}
-        self.drop = {}  # 任务失败指示变量（当 (i,t) 对全部不可行时使用）
 
         # 动态目标函数处理
         self.error_message = None
@@ -160,7 +156,7 @@ class OffloadingModel:
         返回
         -------
         dict
-            {t: {"local": [task_ids], "offload": {j: [task_ids]}, "drop": [task_ids]}}
+            {t: {"local": [task_ids], "offload": {j: [task_ids]}}}
         """
         result = {}
 
@@ -170,12 +166,10 @@ class OffloadingModel:
 
         X_local = self.model.getAttr("x", self.x_local)
         X_offload = self.model.getAttr("x", self.x_offload)
-        X_drop = self.model.getAttr("x", self.drop) if self.drop else {}
 
         for t in self.timeList:
             local_tasks = []
             offload_tasks = {j: [] for j in self.uavList}
-            drop_tasks = []
 
             for i in self.taskList:
                 if not self.task[i].active[t]:
@@ -183,15 +177,13 @@ class OffloadingModel:
 
                 if (i, t) in X_local and X_local[i, t] > 0.5:
                     local_tasks.append(i)
-                elif (i, t) in X_drop and X_drop[i, t] > 0.5:
-                    drop_tasks.append(i)
                 else:
                     for j in self.uavList:
                         if (i, j, t) in X_offload and X_offload[i, j, t] > 0.5:
                             offload_tasks[j].append(i)
                             break
 
-            result[t] = {"local": local_tasks, "offload": offload_tasks, "drop": drop_tasks}
+            result[t] = {"local": local_tasks, "offload": offload_tasks}
 
         return result
 
@@ -212,11 +204,7 @@ class OffloadingModel:
             return False
 
     def _local_feasible(self, i, t):
-        """检查本地时延约束：本地执行时延不超过截止期。
-
-        新增于 2026-03-30：修复 L1-C2 不对称问题
-        对应文档: 第一层约束一致性对齐计划 v2 / 修复 1
-        """
+        """检查本地时延约束：本地执行时延不超过截止期。"""
         try:
             return self.D_hat_local[i][t] <= self.task[i].tau
         except (KeyError, IndexError):
@@ -225,43 +213,27 @@ class OffloadingModel:
     def setupVars(self):
         """创建二进制决策变量。
 
-        仅为活跃且本地可行的任务创建 x_local（修复 2026-03-30）；
-        仅为满足截止期约束（L1-C2）的任务-UAV 对创建 x_offload；
-        为完全不可行的 (i,t) 对创建失败指示变量 drop[i,t]。
+        为所有活跃任务无条件创建 x_local 和 x_offload 变量，
+        让优化器自由选择所有分配选项（超时通过 D/τ > 1 自然反映在目标值中）。
         """
         print("Create Variables for Offloading Model!")
         self.x_local = {}
         self.x_offload = {}
-        self.drop = {}
 
         for i in self.taskList:
             for t in self.timeList:
                 if not self.task[i].active[t]:
                     continue
 
-                # 检查本地可行性（修复 L1-C2 不对称）
-                has_local = self._local_feasible(i, t)
-                if has_local:
-                    self.x_local[i, t] = self.model.addVar(
-                        vtype=gb.GRB.BINARY, lb=0,
-                        name=f"X_local_{i}_{t}",
-                    )
+                self.x_local[i, t] = self.model.addVar(
+                    vtype=gb.GRB.BINARY, lb=0,
+                    name=f"X_local_{i}_{t}",
+                )
 
-                # 检查卸载可行性
-                has_offload = []
                 for j in self.uavList:
-                    if self._offload_feasible(i, j, t):
-                        self.x_offload[i, j, t] = self.model.addVar(
-                            vtype=gb.GRB.BINARY, lb=0,
-                            name=f"X_offload_{i}_{j}_{t}",
-                        )
-                        has_offload.append(j)
-
-                # 若既无本地可行、也无卸载可行，创建失败指示变量
-                if not has_local and not has_offload:
-                    self.drop[i, t] = self.model.addVar(
-                        vtype=gb.GRB.BINARY, lb=0, ub=1,
-                        name=f"drop_{i}_{t}",
+                    self.x_offload[i, j, t] = self.model.addVar(
+                        vtype=gb.GRB.BINARY, lb=0,
+                        name=f"X_offload_{i}_{j}_{t}",
                     )
 
         self.model.update()
@@ -269,36 +241,28 @@ class OffloadingModel:
     def setupCons(self):
         """建立模型约束。
 
-        L1-C1：每个活跃任务在每个时隙必须且只能分配到一个目标（本地、某架 UAV、或失败）。
+        L1-C1：每个活跃任务在所有活跃时隙中恰好分配一次（本地或某架 UAV）。
         L1-C3：若 UAV 设置了最大承载量 N_max，则每时隙分配数不超过上限（可选）。
-
-        修复 2026-03-30：支持失败模式，允许完全不可行的 (i,t) 对以 drop[i,t]=1 表示失败。
         """
         print("Create Constraints for Offloading Model!")
 
-        # (L1-C1) 扩展约束：每个活跃任务 → 本地、某一 UAV、或失败
+        # (L1-C1) 唯一分配：每个活跃任务 → 本地或某一 UAV（按 i 聚合）
         for i in self.taskList:
-            for t in self.timeList:
-                if not self.task[i].active[t]:
-                    continue
-
-                # 组合本地、卸载和失败变量
-                terms = []
-                if (i, t) in self.x_local:
-                    terms.append(self.x_local[i, t])
-
-                for j in self.uavList:
-                    if (i, j, t) in self.x_offload:
-                        terms.append(self.x_offload[i, j, t])
-
-                if (i, t) in self.drop:
-                    terms.append(self.drop[i, t])
-
-                # 约束：必须至少有一个选项被选中
-                self.model.addConstr(
-                    gb.quicksum(terms) == 1,
-                    name=f"C1_assign_flexible_{i}_{t}",
-                )
+            local_sum = gb.quicksum(
+                self.x_local[i, t]
+                for t in self.timeList
+                if (i, t) in self.x_local
+            )
+            offload_sum = gb.quicksum(
+                self.x_offload[i, j, t]
+                for j in self.uavList
+                for t in self.timeList
+                if (i, j, t) in self.x_offload
+            )
+            self.model.addConstr(
+                local_sum + offload_sum == 1,
+                name=f"C1_assign_once_{i}",
+            )
 
         # (L1-C3) 可选 UAV 每时隙承载量上限
         for j in self.uavList:
@@ -354,7 +318,6 @@ class OffloadingModel:
 
         cost1：归一化时延（本地执行 + 卸载执行）
         cost2：归一化边缘计算能耗
-        cost3：任务失败惩罚（新增 2026-03-30）
         """
         # 成本项1：加权归一化时延
         cost1 = gb.quicksum(
@@ -382,15 +345,8 @@ class OffloadingModel:
             if self.task[i].active[t] and (i, j, t) in self.x_offload
         )
 
-        # 成本项3：任务失败惩罚（新增 2026-03-30）
-        penalty_drop = getattr(self, 'penalty_drop', 1e4)
-        cost3 = penalty_drop * gb.quicksum(
-            self.drop[i, t]
-            for i, t in self.drop.keys()
-        )
-
-        costs = [cost1, cost2, cost3]
-        weights = [1, 1, 1]
+        costs = [cost1, cost2]
+        weights = [1, 1]
         self.model.setObjective(
             gb.quicksum(w * c for w, c in zip(costs, weights)),
             gb.GRB.MINIMIZE,

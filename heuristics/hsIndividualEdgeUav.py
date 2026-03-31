@@ -461,7 +461,6 @@ class hsIndividualEdgeUav:
                         gamma_w=getattr(self.config, "gamma_w", 1.0),
                         dynamic_obj_func=func,
                     )
-                    model.penalty_drop = float(getattr(self.config, "penalty_drop", 1e4))
                     feasible, cost = model.solveProblem()
                     outputs = model.getOutputs()
                     score = evaluate_solution(
@@ -484,7 +483,6 @@ class hsIndividualEdgeUav:
                     gamma_w=getattr(self.config, "gamma_w", 1.0),
                     dynamic_obj_func=func,
                 )
-                model.penalty_drop = float(getattr(self.config, "penalty_drop", 1e4))
                 feasible, cost = model.solveProblem()
                 outputs = model.getOutputs()
                 score = evaluate_solution(

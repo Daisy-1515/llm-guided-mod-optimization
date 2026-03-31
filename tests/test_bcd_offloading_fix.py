@@ -7,7 +7,6 @@ the Gurobi model without requiring explicit setupVars() calls.
 import pytest
 from edge_uav.model.offloading import OffloadingModel
 from edge_uav.data import ComputeTask, UAV
-import numpy as np
 
 
 def create_simple_scenario():
@@ -20,6 +19,7 @@ def create_simple_scenario():
             D_r=1e5,
             F=1e9,
             tau=10.0,
+            active={0: True},
         )
     }
     uavs = {
@@ -42,16 +42,19 @@ def create_simple_scenario():
 
 
 def create_precompute_params(scenario):
-    """Create minimal precompute parameters."""
-    n_tasks = len(scenario.tasks)
-    n_uavs = len(scenario.uavs)
-    n_time = len(scenario.time_slots)
+    """Create minimal precompute parameters using nested dicts (matching OffloadingModel API)."""
+    # D_hat_local[i][t]
+    D_hat_local = {0: {0: 5.0}}
+    # D_hat_offload[i][j][t]
+    D_hat_offload = {0: {0: {0: 3.0}}}
+    # E_hat_comp[j][i][t]
+    E_hat_comp = {0: {0: {0: 1.0}}}
 
     class Params:
         def __init__(self):
-            self.D_hat_local = np.ones((n_tasks, n_time)) * 5.0
-            self.D_hat_offload = np.ones((n_tasks, n_uavs, n_time)) * 3.0
-            self.E_hat_comp = np.ones((n_tasks, n_time)) * 1.0
+            self.D_hat_local = D_hat_local
+            self.D_hat_offload = D_hat_offload
+            self.E_hat_comp = E_hat_comp
 
     return Params()
 

@@ -516,8 +516,6 @@ def run_bcd_loop(
                 gamma_w=float(getattr(config, "gamma_w", 1.0)),
                 dynamic_obj_func=dynamic_obj_func,
             )
-            # 传递 penalty_drop（新增 2026-03-30，修复 L1-C2 不对称）
-            offloading_model.penalty_drop = float(getattr(config, "penalty_drop", 1e4))
             offloading_model.solveProblem()
             offloading_outputs = validate_offloading_outputs(
                 offloading_model.getOutputs(), scenario
