@@ -29,6 +29,7 @@ from script_common import (
     make_edge_uav_solver,
     write_json,
 )
+from edge_uav.model.bcd_loop import run_bcd_loop
 from edge_uav.model.evaluator import INVALID_OUTPUT_PENALTY, evaluate_solution
 from edge_uav.model.offloading import OffloadingModel
 from edge_uav.model.precompute import (
@@ -36,6 +37,7 @@ from edge_uav.model.precompute import (
     make_initial_level2_snapshot,
     precompute_offloading_inputs,
 )
+from edge_uav.model.trajectory_opt import TrajectoryOptParams
 from heuristics.hsIndividualEdgeUav import hsIndividualEdgeUav
 from heuristics.hs_way_constants import WAY_RANDOM
 
@@ -270,7 +272,67 @@ def run_group_random_hs(bundle, mode, group_name):
     }
 
 
+def _make_traj_params(config):
+    """构造 TrajectoryOptParams，与 hsIndividualEdgeUav._create_trajectory_opt_params 保持一致。"""
+    v_max = float(
+        getattr(config, 'v_traj_max', getattr(config, 'v_U_max', getattr(config, 'v_max', 30.0)))
+    )
+    d_safe = float(getattr(config, 'd_safe_traj', getattr(config, 'd_safe', 5.0)))
+    return TrajectoryOptParams(
+        eta_1=float(config.eta_1),
+        eta_2=float(config.eta_2),
+        eta_3=float(config.eta_3),
+        eta_4=float(config.eta_4),
+        v_tip=float(config.v_tip),
+        v_max=v_max,
+        d_safe=d_safe,
+    )
+
+
 def solve_default_objective(bundle, *, alpha, gamma_w, evaluation_index):
+    if getattr(bundle.params, 'use_bcd_loop', False):
+        # BCD 路径：与 A/B/C 组一致的 Level-2 优化，dynamic_obj_func=None 使用默认目标
+        params = PrecomputeParams.from_config(bundle.params)
+        traj_params = _make_traj_params(bundle.params)
+        initial_snapshot = make_initial_level2_snapshot(bundle.scenario)
+        bcd_result = run_bcd_loop(
+            scenario=bundle.scenario,
+            config=bundle.params,
+            params=params,
+            traj_params=traj_params,
+            dynamic_obj_func=None,
+            initial_snapshot=initial_snapshot,
+            max_bcd_iter=getattr(bundle.params, 'bcd_max_iter', 5),
+            eps_bcd=getattr(bundle.params, 'bcd_eps', 1e-3),
+            cost_rollback_delta=getattr(bundle.params, 'bcd_rollback_delta', 0.05),
+            max_rollbacks=getattr(bundle.params, 'bcd_max_rollbacks', 2),
+        )
+        # 基于 BCD 最终快照重新预计算，确保 evaluate_solution 使用最优轨迹
+        final_precompute = precompute_offloading_inputs(
+            bundle.scenario,
+            params,
+            bcd_result.snapshot,
+            mu=None,
+            active_only=True,
+        )
+        score = evaluate_solution(bcd_result.offloading_outputs, final_precompute, bundle.scenario)
+        return {
+            "evaluation_index": evaluation_index,
+            "generation": 0,
+            "score": float(score),
+            "feasible": bool(bcd_result.converged),
+            "llm_status": "default",
+            "used_default_obj": True,
+            "solver_cost": float(bcd_result.total_cost),
+            "response_format": bcd_result.offloading_error_message or "",
+            "bcd_enabled": True,
+            "bcd_meta": {
+                "bcd_iterations": bcd_result.bcd_iterations,
+                "bcd_converged": bcd_result.converged,
+                "bcd_cost_history": list(bcd_result.cost_history),
+            },
+        }
+    # 原路径：仅 Level 1（use_bcd_loop=False）
     model = OffloadingModel(
         tasks=bundle.scenario.tasks,
         uavs=bundle.scenario.uavs,
