@@ -321,7 +321,13 @@ class EdgeUavPrompts:
             "12. Expression function rules:\n"
             "   - Use gb.quicksum()/gb.max_()/gb.abs_() ONLY when the expression contains Gurobi variables.\n"
             "   - Use Python sum()/max()/abs() when working with pure constants (parameters).\n"
-            #"【中文注释】12. 表达式函数：含变量用 gb.*，纯常量用 Python 内置函数。\n"
+            "   - You may use `import math` and apply math.exp(), math.log(), math.log1p(), "
+            "math.sqrt(), math.pow(), math.tanh() on PURE SCALAR CONSTANTS to create "
+            "nonlinear coefficient transformations. The result is still a scalar, so "
+            "multiplying it by a binary variable remains linear for Gurobi.\n"
+            "   - Example: `math.exp(D_hat_offload[i][j][t] / task[i].tau) * x_offload[i, j, t]` "
+            "is valid — exp() operates on a constant, producing a scalar coefficient.\n"
+            #"【中文注释】12. 表达式函数：含变量用 gb.*，纯常量用 Python 内置函数或 math 模块。\n"
 
             "13. Quadratic term rules:\n"
             "   - For squared terms, use variable * variable directly.\n"
@@ -339,6 +345,18 @@ class EdgeUavPrompts:
             "   - All precomputed constants (D_hat_*, E_hat_*) are scalars - multiplying them "
             "by a binary variable is always linear.\n"
             #"【中文注释】15. 非线性处理：二元变量乘积需引入辅助变量+大 M；常量乘二元变量保持线性。\n"
+
+            "16. Coefficient diversity — STRONGLY ENCOURAGED:\n"
+            "   - Go beyond simple linear ratios (D/tau, E/E_max). Transform scalar constants "
+            "with nonlinear functions to reshape the cost landscape:\n"
+            "     * Exponential urgency:  math.exp(k * D_hat / tau)  — sharply penalizes near-deadline tasks\n"
+            "     * Logarithmic saturation:  math.log1p(E_hat / E_max)  — diminishing returns on energy cost\n"
+            "     * Square-root smoothing:  math.sqrt(D_hat / tau)  — gentle sub-linear penalty\n"
+            "     * Sigmoid-like focus:  math.tanh(k * (D_hat/tau - threshold))  — step-like penalty near threshold\n"
+            "     * Power-law:  math.pow(D_hat / tau, p)  — tunable convexity (p>1 convex, p<1 concave)\n"
+            "   - These all produce scalar coefficients, so `f(constant) * binary_var` is linear for Gurobi.\n"
+            "   - Combine different transforms across cost components for richer trade-off surfaces.\n"
+            #"【中文注释】16. 系数多样性（强烈建议）：用 exp/log/sqrt/tanh/pow 变换常数系数，丰富目标搜索空间。\n"
         )
         return raw.replace("{", "{{").replace("}", "}}")
 

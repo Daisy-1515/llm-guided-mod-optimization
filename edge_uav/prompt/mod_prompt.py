@@ -220,6 +220,10 @@ class EdgeUavModPrompts(EdgeUavPrompts):
                 "c) Use only available precomputed constants and model variables.\n"
                 "d) Include active-task gating in every task-related summation.\n"
                 "e) Do NOT try to optimize every aspect equally - pick one main bias and make it obvious.\n"
+                "f) STRONGLY ENCOURAGED: use `import math` and apply nonlinear transforms "
+                "(math.exp, math.log1p, math.sqrt, math.tanh, math.pow) on scalar constants "
+                "to create diverse coefficient shapes. Example: math.exp(2.0 * D_hat/tau) * x_offload "
+                "is valid and linear for Gurobi. Avoid repeating the same simple D/tau ratio across candidates.\n"
             ),
         }
         return self._build_core_prompt(self._scenario_block, instruction)
@@ -303,6 +307,10 @@ class EdgeUavModPrompts(EdgeUavPrompts):
                 "penalty structure, or local-vs-offload preference logic.\n"
                 "c) You may sacrifice some strengths of the previous best candidate if that helps explore a new direction.\n"
                 "d) Keep the formulation linear, active-task-gated, and solver-compatible.\n"
+                "e) STRONGLY ENCOURAGED: use `import math` and apply nonlinear transforms "
+                "(math.exp, math.log1p, math.sqrt, math.tanh, math.pow) on scalar constants "
+                "to reshape cost coefficients. Different transform families produce fundamentally "
+                "different optimization landscapes - this is a key way to achieve structural novelty.\n"
                 "\n"
                 "Acceptable new directions include deadline-priority-first, proximity clustering, "
                 "fairness-aware allocation, or conservative offloading under energy stress.\n"
