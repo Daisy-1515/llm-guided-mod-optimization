@@ -15,6 +15,8 @@ dependencies = [
     "cvxpy>=1.7.2",
     "ecos>=2.0.14",
     "scs>=3.2.8",
+    "matplotlib>=3.10.8",
+    "plotly>=6.6.0",
 ]
 
 [dependency-groups]
