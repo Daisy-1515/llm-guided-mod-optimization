@@ -97,9 +97,9 @@ def parse_args():
         help="Override iteration for HS-based groups.",
     )
     parser.add_argument(
-        "--use-bcd-loop",
+        "--no-bcd-loop",
         action="store_true",
-        help="Enable BCD loop for all groups. Default stays off.",
+        help="Disable BCD loop. Default is on.",
     )
     parser.add_argument(
         "--dry-run",
@@ -115,7 +115,7 @@ def make_params(args):
         params,
         pop_size=args.hs_pop_size,
         iteration=args.hs_iterations,
-        use_bcd_loop=args.use_bcd_loop,
+        use_bcd_loop=not args.no_bcd_loop,
     )
     return params
 
