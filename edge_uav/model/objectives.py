@@ -29,7 +29,7 @@ CANONICAL_OBJECTIVE_V1 = r"""
 约束：
     同时参见 offloading.py 的 L1-C1 ~ L1-C3
 
-语义：每个任务在所有活跃时隙中恰好分配一次（本地或卸载到某 UAV），
+语义：每个活跃 (i,t) 在对应时隙中恰好分配到一个目标（本地或卸载到某 UAV），
 超时通过 D/τ > 1 自然反映在目标值中。
 """
 
@@ -132,11 +132,11 @@ def compute_objective_value(
 CONSTRAINT_REFERENCE = """
 约束文档参考（见 offloading.py）
 
-L1-C1：分配约束（按 i 聚合）
-    对于每个任务 i：
-    sum_t x_local[i,t] + sum_j sum_t x_offload[i,j,t] == 1
+L1-C1：分配约束（per-(i,t)）
+    对于每个活跃 (i, t)：
+    x_local[i,t] + sum_j x_offload[i,j,t] == 1
 
-    说明：每个任务在所有活跃时隙中恰好分配一次（本地或卸载到某 UAV）。
+    说明：每个活跃 (i,t) 在对应时隙中恰好分配到本地或某架 UAV。
 
 L1-C3（UAV 承载量约束，可选）：
     sum_i x_offload[i,j,t] ≤ N_max[j]

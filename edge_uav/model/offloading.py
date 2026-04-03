@@ -242,28 +242,25 @@ class OffloadingModel:
     def setupCons(self):
         """建立模型约束。
 
-        L1-C1：每个活跃任务在所有活跃时隙中恰好分配一次（本地或某架 UAV）。
+        L1-C1：每个活跃 (i,t) 在对应时隙中恰好分配到一个目标（本地或某架 UAV）。
         L1-C3：若 UAV 设置了最大承载量 N_max，则每时隙分配数不超过上限（可选）。
         """
         print("Create Constraints for Offloading Model!")
 
-        # (L1-C1) 唯一分配：每个活跃任务 → 本地或某一 UAV（按 i 聚合）
+        # (L1-C1) 唯一分配：每个活跃 (i,t) → 本地或某一 UAV
         for i in self.taskList:
-            local_sum = gb.quicksum(
-                self.x_local[i, t]
-                for t in self.timeList
-                if (i, t) in self.x_local
-            )
-            offload_sum = gb.quicksum(
-                self.x_offload[i, j, t]
-                for j in self.uavList
-                for t in self.timeList
-                if (i, j, t) in self.x_offload
-            )
-            self.model.addConstr(
-                local_sum + offload_sum == 1,
-                name=f"C1_assign_once_{i}",
-            )
+            for t in self.timeList:
+                if not self.task[i].active[t]:
+                    continue
+                offload_sum = gb.quicksum(
+                    self.x_offload[i, j, t]
+                    for j in self.uavList
+                    if (i, j, t) in self.x_offload
+                )
+                self.model.addConstr(
+                    self.x_local[i, t] + offload_sum == 1,
+                    name=f"C1_assign_{i}_{t}",
+                )
 
         # (L1-C3) 可选 UAV 每时隙承载量上限
         for j in self.uavList:

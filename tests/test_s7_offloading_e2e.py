@@ -82,15 +82,20 @@ def _local_count(outputs):
 
 def _task_count(scenario):
     """统计场景中活跃 (i, t) 对数。"""
-    return len(scenario.tasks)
+    return sum(
+        1 for i, task in scenario.tasks.items()
+        for t in scenario.time_slots
+        if task.active.get(t, False)
+    )
 
 
 def _all_local_cost(result, scenario):
-    """假设全本地执行时的归一化时延总成本 (alpha=1)。"""
+    """假设全本地执行时的归一化时延总成本 (alpha=1)，对所有活跃 (i,t) 求和。"""
     return sum(
-        result.D_hat_local[i][next(t for t in scenario.time_slots if task.active.get(t, False))]
-        / scenario.tasks[i].tau
+        result.D_hat_local[i][t] / scenario.tasks[i].tau
         for i, task in scenario.tasks.items()
+        for t in scenario.time_slots
+        if task.active.get(t, False)
     )
 
 

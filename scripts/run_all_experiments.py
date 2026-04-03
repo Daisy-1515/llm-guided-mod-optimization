@@ -142,8 +142,7 @@ def flatten_evaluations(evaluation_history):
         for individual in generation_record["individuals"]:
             step = get_simulation_step(individual)
             score = float(individual.get("evaluation_score", INVALID_OUTPUT_PENALTY))
-            flattened.append(
-                {
+            row = {
                     "evaluation_index": evaluation_index,
                     "generation": generation,
                     "score": score,
@@ -152,8 +151,16 @@ def flatten_evaluations(evaluation_history):
                     "used_default_obj": bool(step.get("used_default_obj", True)),
                     "solver_cost": float(step.get("solver_cost", -1.0)),
                     "response_format": step.get("response_format", ""),
+                    "bcd_enabled": bool(step.get("bcd_enabled", False)),
                 }
-            )
+            bcd_meta_raw = step.get("bcd_meta")
+            if bcd_meta_raw:
+                row["bcd_meta"] = {
+                    "bcd_iterations": bcd_meta_raw.get("bcd_iterations", 0),
+                    "bcd_converged": bcd_meta_raw.get("bcd_converged", False),
+                    "bcd_cost_history": bcd_meta_raw.get("bcd_cost_history", []),
+                }
+            flattened.append(row)
             evaluation_index += 1
     return flattened
 

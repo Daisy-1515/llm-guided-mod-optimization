@@ -2,11 +2,11 @@
 
 测试核心项：
   T1. 变量无条件创建 (test_vars_unconditional)：所有活跃 (i,t) 都有 x_local 和 x_offload
-  T2. 按 i 聚合约束 (test_assign_once_per_task)：每个任务恰好分配一次
+  T2. per-(i,t) 分配约束 (test_assign_per_slot)：每个活跃 (i,t) 恰好分配一次
   T3. 输出格式无 drop (test_output_no_drop)：getOutputs 不含 drop 字段
   T4. 超时任务仍被分配 (test_tight_deadline_still_assigned)：D > tau 的任务不被丢弃
 
-对应变更：移除 drop 失败机制，回退到 9d562f2 语义 + 移除卸载过滤
+对应变更：恢复 per-(i,t) 语义，移除 drop 失败机制
 """
 
 from __future__ import annotations
@@ -162,12 +162,12 @@ def test_vars_unconditional():
 
 
 # =====================================================================
-# Test T2: 按 i 聚合约束（每个任务恰好分配一次）
+# Test T2: per-(i,t) 分配约束
 # =====================================================================
 
 
-def test_assign_once_per_task():
-    """求解后，每个任务在所有时隙中恰好出现在一个位置。"""
+def test_assign_per_slot():
+    """求解后，每个活跃 (i,t) 在对应时隙恰好分配 1 次（本地或卸载）。"""
     scenario = _make_normal_scenario()
     model, _ = _build_model(scenario)
     feasible, cost = model.solveProblem()
@@ -175,16 +175,18 @@ def test_assign_once_per_task():
     assert feasible, "常规场景应可行"
     outputs = model.getOutputs()
 
-    # 统计每个任务被分配的次数
-    for i in scenario.tasks:
-        count = 0
-        for t in outputs:
+    # 统计每个活跃 (i,t) 被分配的次数
+    for i, task in scenario.tasks.items():
+        for t in scenario.time_slots:
+            if not task.active.get(t, False):
+                continue
+            count = 0
             if i in outputs[t]["local"]:
                 count += 1
             for j in outputs[t]["offload"]:
                 if i in outputs[t]["offload"][j]:
                     count += 1
-        assert count == 1, f"任务 {i} 应恰好分配 1 次，实际 {count} 次"
+            assert count == 1, f"活跃 ({i},{t}) 应恰好分配 1 次，实际 {count} 次"
 
 
 # =====================================================================
@@ -224,20 +226,20 @@ def test_tight_deadline_still_assigned():
 
     outputs = model.getOutputs()
 
-    # 每个任务都应被分配
-    for i in scenario.tasks:
-        assigned = False
-        for t in outputs:
+    # 每个活跃 (i,t) 都应被分配
+    for i, task in scenario.tasks.items():
+        for t in scenario.time_slots:
+            if not task.active.get(t, False):
+                continue
+            assigned = False
             if i in outputs[t]["local"]:
                 assigned = True
-                break
-            for j in outputs[t]["offload"]:
-                if i in outputs[t]["offload"][j]:
-                    assigned = True
-                    break
-            if assigned:
-                break
-        assert assigned, f"任务 {i} 应被分配（即使超时），不应被丢弃"
+            else:
+                for j in outputs[t]["offload"]:
+                    if i in outputs[t]["offload"][j]:
+                        assigned = True
+                        break
+            assert assigned, f"活跃 ({i},{t}) 应被分配（即使超时），不应被丢弃"
 
     # 确认目标值 > 1（因为 D/tau > 1 对超时任务）
     assert cost > 1.0, f"超时任务的目标值应 > 1，实际 {cost}"

@@ -20,7 +20,7 @@ INVALID_OUTPUT_PENALTY: float = 1e12
 def _index_outputs(
     outputs: dict,
     scenario: Any,
-) -> dict[int, tuple[str, int | None, int]]:
+) -> dict[tuple[int, int], tuple[str, int | None]]:
     """将 OffloadingModel.getOutputs() 的嵌套结构转为平坦映射并校验。
 
     返回
@@ -36,7 +36,7 @@ def _index_outputs(
     valid_tasks = set(scenario.tasks.keys())
     valid_uavs = set(scenario.uavs.keys())
 
-    assignments: dict[int, tuple[str, int | None, int]] = {}
+    assignments: dict[tuple[int, int], tuple[str, int | None]] = {}
 
     for t in scenario.time_slots:
         slot = outputs.get(t)
@@ -47,11 +47,11 @@ def _index_outputs(
         for i in slot.get("local", []):
             if i not in valid_tasks:
                 raise ValueError(f"unknown task_id={i} in local at t={t}")
-            if i in assignments:
-                raise ValueError(f"duplicate assignment for task {i}")
+            if (i, t) in assignments:
+                raise ValueError(f"duplicate assignment for task {i} at t={t}")
             if not scenario.tasks[i].active.get(t, False):
                 raise ValueError(f"inactive task ({i}, {t}) incorrectly assigned")
-            assignments[i] = ("local", None, t)
+            assignments[(i, t)] = ("local", None)
 
         # 卸载分配
         for j, task_ids in slot.get("offload", {}).items():
@@ -60,16 +60,17 @@ def _index_outputs(
             for i in task_ids:
                 if i not in valid_tasks:
                     raise ValueError(f"unknown task_id={i} in offload to UAV {j} at t={t}")
-                if i in assignments:
-                    raise ValueError(f"duplicate assignment for task {i}")
+                if (i, t) in assignments:
+                    raise ValueError(f"duplicate assignment for task {i} at t={t}")
                 if not scenario.tasks[i].active.get(t, False):
                     raise ValueError(f"inactive task ({i}, {t}) incorrectly assigned")
-                assignments[i] = ("offload", j, t)
+                assignments[(i, t)] = ("offload", j)
 
-    # 完备性检查：每个 active (i, t) 必须被分配，inactive 不得出现
-    for i in scenario.tasks:
-        if i not in assignments:
-            raise ValueError(f"task {i} not assigned")
+    # 完备性检查：每个 active (i, t) 必须被分配
+    for i, task in scenario.tasks.items():
+        for t in scenario.time_slots:
+            if task.active.get(t, False) and (i, t) not in assignments:
+                raise ValueError(f"active (i={i}, t={t}) not assigned")
 
     return assignments
 
@@ -145,25 +146,28 @@ def _compute_score(
 
     for i, task in scenario.tasks.items():
         tau = float(task.tau)
-        mode, j, t = assignments[i]
+        for t in scenario.time_slots:
+            if not task.active.get(t, False):
+                continue
+            mode, j = assignments[(i, t)]
 
-        if mode == "local":
-            delay = precompute_result.D_hat_local[i][t]
-        else:
-            delay = precompute_result.D_hat_offload[i][j][t]
-            energy_term += (
-                precompute_result.E_hat_comp[j][i][t]
-                / scenario.uavs[j].E_max
-            )
-            offload_counts[j] += 1
+            if mode == "local":
+                delay = precompute_result.D_hat_local[i][t]
+            else:
+                delay = precompute_result.D_hat_offload[i][j][t]
+                energy_term += (
+                    precompute_result.E_hat_comp[j][i][t]
+                    / scenario.uavs[j].E_max
+                )
+                offload_counts[j] += 1
 
-        normalized_delay = delay / tau
-        delay_term += normalized_delay
+            normalized_delay = delay / tau
+            delay_term += normalized_delay
 
-        if deadline_weight > 0.0:
-            overshoot = normalized_delay - 1.0
-            if overshoot > 0.0:
-                deadline_term += overshoot
+            if deadline_weight > 0.0:
+                overshoot = normalized_delay - 1.0
+                if overshoot > 0.0:
+                    deadline_term += overshoot
 
     # 负载均衡项：卸载任务数的方差（归一化）
     balance_term = 0.0

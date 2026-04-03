@@ -524,3 +524,11 @@ class hsIndividualEdgeUav:
         # 5) 记录到 promptHistory
         self.promptHistory["evaluation_score"] = float(score)
         self.promptHistory["simulation_steps"]["0"] = full_info
+        # BCD 可观测性：将 bcd_enabled/bcd_meta 提升到 promptHistory 顶层，与 D1 输出格式对齐
+        self.promptHistory["bcd_enabled"] = full_info.get("bcd_enabled", False)
+        if bcd_meta:
+            self.promptHistory["bcd_meta"] = {
+                "bcd_iterations": bcd_meta.get("bcd_iterations", 0),
+                "bcd_converged": bcd_meta.get("bcd_converged", False),
+                "bcd_cost_history": bcd_meta.get("bcd_cost_history", []),
+            }
