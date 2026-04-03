@@ -50,7 +50,10 @@ def base_scenario_1uav():
             'x_max': 100.0,
             'y_max': 100.0,
             'H': 10.0,
-            'B_up': 1e6,
+            'B_up': 2e7,
+            'P_i':   0.5,
+            'rho_0': 1e-5,
+            'N_0':   1e-10,
             'depot_pos': (50.0, 50.0),
         },
     )
@@ -101,7 +104,10 @@ def base_scenario_2uav():
             'x_max': 100.0,
             'y_max': 100.0,
             'H': 10.0,
-            'B_up': 1e6,
+            'B_up': 2e7,
+            'P_i':   0.5,
+            'rho_0': 1e-5,
+            'N_0':   1e-10,
             'depot_pos': (50.0, 50.0),
         },
     )
@@ -113,8 +119,8 @@ def params():
     """PrecomputeParams fixture."""
     return PrecomputeParams(
         H=10.0,
-        B_up=1e6,
-        B_down=1e6,
+        B_up=2e7,
+        B_down=2e7,
         P_i=0.5,
         P_j=1.0,
         N_0=1e-10,

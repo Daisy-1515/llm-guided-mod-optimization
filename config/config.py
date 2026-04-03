@@ -64,8 +64,8 @@ class configPara:
         self.d_U_safe = 50.0    # UAV 间安全距离 (m)
 
         # 通信
-        self.B_up = 1e6         # 上行带宽 (Hz)
-        self.B_down = 1e6       # 下行带宽 (Hz)
+        self.B_up = 2e7         # 上行带宽 (Hz)
+        self.B_down = 2e7       # 下行带宽 (Hz)
         self.P_i = 0.5          # TD 发射功率 (W)
         self.P_j = 1.0          # UAV 发射功率 (W)
         self.rho_0 = 1e-5       # 1m 参考信道增益
