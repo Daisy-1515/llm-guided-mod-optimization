@@ -248,7 +248,7 @@ def check_trajectory_monotonicity(
     x_max = float(meta.get("x_max", 1e6))
     y_max = float(meta.get("y_max", 1e6))
     delta_t = float(getattr(config, "delta_t", 1.0))  # time slot duration (s)
-    v_max = float(getattr(config, "v_max", 20.0))  # m/s
+    v_max = float(getattr(config, "v_traj_max", getattr(config, "v_U_max", getattr(config, "v_max", 30.0))))  # m/s
 
     errors: List[str] = []
 
@@ -265,8 +265,9 @@ def check_trajectory_monotonicity(
 
             x, y = q_j[t]
 
-            # Check bounds
-            if not (0.0 <= x <= x_max and 0.0 <= y <= y_max):
+            # Check bounds (allow 1e-9 tolerance for floating-point rounding)
+            _eps = 1e-9
+            if not (-_eps <= x <= x_max + _eps and -_eps <= y <= y_max + _eps):
                 errors.append(f"UAV {j}, t={t}: position ({x}, {y}) out of bounds")
 
             # Check for invalid values

@@ -228,10 +228,10 @@ class EdgeUavScenarioGenerator:
         return tasks
 
     def _generate_uavs(self, config: configPara) -> dict[int, UAV]:
-        """生成 UAV 集合（固定基站方案）。
+        """生成 UAV 集合。
 
-        所有 UAV 的起点和终点均为 depot_pos，硬件参数从 config 读取。
-        当前方案下不依赖随机数。
+        所有 UAV 的起点为地图左下角 (0, 0)，终点为地图右上角 (x_max, y_max)，
+        硬件参数从 config 读取。当前方案下不依赖随机数。
 
         Args:
             config: Edge UAV 场景相关配置对象。
@@ -239,13 +239,14 @@ class EdgeUavScenarioGenerator:
         Returns:
             以 UAV 索引为键、UAV 实例为值的字典。
         """
-        depot_pos = (float(config.depot_x), float(config.depot_y))
+        start_pos = (0.0, 0.0)
+        end_pos = (float(config.x_max), float(config.y_max))
         uavs = {}
         for j in range(config.numUAVs):
             uavs[j] = UAV(
                 index=j,
-                pos=depot_pos,
-                pos_final=depot_pos,
+                pos=start_pos,
+                pos_final=end_pos,
                 E_max=float(config.E_max),
                 f_max=float(config.f_max),
                 N_max=getattr(config, "N_max", None),
@@ -395,8 +396,6 @@ class EdgeUavScenarioGenerator:
         x_max = float(config.x_max)
         y_max = float(config.y_max)
         T = int(config.T)
-        depot_pos = (float(config.depot_x), float(config.depot_y))
-
         # time_slots 一致性
         if list(scenario.time_slots) != list(range(T)):
             errors.append(f"time_slots must equal list(range({T})), got {scenario.time_slots}")
@@ -456,10 +455,6 @@ class EdgeUavScenarioGenerator:
                 errors.append(f"UAV {uid} start position out of bounds: {uav.pos}")
             if not self._is_within_map(uav.pos_final, x_max, y_max):
                 errors.append(f"UAV {uid} final position out of bounds: {uav.pos_final}")
-            if uav.pos != depot_pos:
-                errors.append(f"UAV {uid} start position {uav.pos} != depot {depot_pos}")
-            if uav.pos_final != depot_pos:
-                errors.append(f"UAV {uid} final position {uav.pos_final} != depot {depot_pos}")
 
         if len(uav_indices) != len(set(uav_indices)):
             errors.append("UAV indices are not unique")

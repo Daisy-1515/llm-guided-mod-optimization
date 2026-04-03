@@ -16,7 +16,7 @@ import argparse
 import json
 import statistics
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -218,36 +218,33 @@ def run_group_a(bundle):
 
 
 def run_group_b(bundle):
-    history = []
-    eval_budget = bundle.params.popSize * bundle.params.iteration
     started = time.time()
-    for evaluation_index in range(1, eval_budget + 1):
-        individual = hsIndividualEdgeUav(
-            bundle.params,
-            bundle.scenario,
-            shared_precompute=bundle.precompute,
-        )
-        individual.runOptModel("", WAY_RANDOM)
-        step = individual.promptHistory["simulation_steps"]["0"]
-        history.append(
-            {
-                "evaluation_index": evaluation_index,
-                "generation": 0,
-                "score": float(individual.promptHistory["evaluation_score"]),
-                "feasible": bool(step.get("feasible", False)),
-                "llm_status": step.get("llm_status", "unknown"),
-                "used_default_obj": bool(step.get("used_default_obj", True)),
-                "solver_cost": float(step.get("solver_cost", -1.0)),
-                "response_format": step.get("response_format", ""),
-            }
-        )
+    individual = hsIndividualEdgeUav(
+        bundle.params,
+        bundle.scenario,
+        shared_precompute=bundle.precompute,
+    )
+    individual.runOptModel("", WAY_RANDOM)
+    step = individual.promptHistory["simulation_steps"]["0"]
+    history = [
+        {
+            "evaluation_index": 1,
+            "generation": 0,
+            "score": float(individual.promptHistory["evaluation_score"]),
+            "feasible": bool(step.get("feasible", False)),
+            "llm_status": step.get("llm_status", "unknown"),
+            "used_default_obj": bool(step.get("used_default_obj", True)),
+            "solver_cost": float(step.get("solver_cost", -1.0)),
+            "response_format": step.get("response_format", ""),
+        }
+    ]
     wall_time_sec = time.time() - started
     return {
         "group": "B",
         "label": "llm_only",
-        "eval_budget_target": eval_budget,
-        "eval_budget_used": len(history),
-        "llm_calls": len(history),
+        "eval_budget_target": 1,
+        "eval_budget_used": 1,
+        "llm_calls": 1,
         "wall_time_sec": wall_time_sec,
         "history": history,
         "metrics": summarize_history(history),
@@ -337,6 +334,12 @@ def solve_default_objective(bundle, *, alpha, gamma_w, evaluation_index):
                 "bcd_iterations": bcd_result.bcd_iterations,
                 "bcd_converged": bcd_result.converged,
                 "bcd_cost_history": list(bcd_result.cost_history),
+                "optimal_snapshot": asdict(bcd_result.snapshot),
+            },
+            "task_positions": {str(tid): list(t.pos) for tid, t in bundle.scenario.tasks.items()},
+            "uav_positions": {
+                str(uid): {"start": list(u.pos), "end": list(u.pos_final)}
+                for uid, u in bundle.scenario.uavs.items()
             },
         }
     # 原路径：仅 Level 1（use_bcd_loop=False）
@@ -367,24 +370,17 @@ def solve_default_objective(bundle, *, alpha, gamma_w, evaluation_index):
 
 
 def run_group_default(bundle, *, group_name, alpha, gamma_w):
-    eval_budget = bundle.params.popSize * bundle.params.iteration
-    history = []
     started = time.time()
-    for evaluation_index in range(1, eval_budget + 1):
-        history.append(
-            solve_default_objective(
-                bundle,
-                alpha=alpha,
-                gamma_w=gamma_w,
-                evaluation_index=evaluation_index,
-            )
-        )
+    result = solve_default_objective(
+        bundle, alpha=alpha, gamma_w=gamma_w, evaluation_index=1,
+    )
     wall_time_sec = time.time() - started
+    history = [result]
     return {
         "group": group_name,
         "label": "default_objective",
-        "eval_budget_target": eval_budget,
-        "eval_budget_used": len(history),
+        "eval_budget_target": 1,
+        "eval_budget_used": 1,
         "llm_calls": 0,
         "wall_time_sec": wall_time_sec,
         "history": history,

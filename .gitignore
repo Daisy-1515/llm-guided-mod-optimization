@@ -51,3 +51,4 @@ discussion/
 .env.*
 *.local
 .vscode/settings.json
+config/setting copy.cfg

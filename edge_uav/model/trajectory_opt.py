@@ -570,14 +570,10 @@ def _build_sca_subproblem(
         # Delay = 2√(H² + ||q_j - w_i||²) / r(H² + ||q_j - w_i||²)
         # Use lower bound on rate + inv_pos
 
-        # Position of central base station
-        w_i = scenario.meta.get('depot_pos', (x_max / 2, y_max / 2))
-        if isinstance(w_i, (list, tuple)):
-            w_i = tuple(w_i)
-        else:
-            w_i = (x_max / 2, y_max / 2)
+        # Position of task device on the ground
+        w_i = tuple(tasks[i].pos)
 
-        # Horizontal position difference from UAV j to base station for task i
+        # Horizontal position difference from UAV j to task device for task i
         pos_diff = q_var[j][t] - np.array(w_i, dtype=float)
 
         # Rate lower bound (using pre-computed reference from q_ref)
