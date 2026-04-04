@@ -126,6 +126,7 @@ def test_run_bcd_loop_passes_configured_sca_controls():
     ra_result = SimpleNamespace(
         f_edge={0: {0: {0: 1e9, 1: 1e9, 2: 1e9}}},
         diagnostics={"binding_slots": 0},
+        objective_value=0.0,
     )
     offloading_outputs = {
         0: {"local": [0], "offload": {0: []}},

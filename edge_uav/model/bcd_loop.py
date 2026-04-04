@@ -633,9 +633,10 @@ def run_bcd_loop(
             raise
 
         # -------- P7: Compute real system cost and cost rollback --------
-        # TODO: Implement full system cost calculation from scenario + config
-        # Currently using trajectory objective as proxy
-        cost_new = cost_traj
+        # Complete L2 objective: (L2a local delay + compute energy) + (L2b offload delay + flight energy)
+        # = ra_result.objective_value + cost_traj
+        # Corresponds to L2-obj terms: (1+3) + (2+4)
+        cost_new = ra_result.objective_value + cost_traj
 
         # Cost rollback mechanism (only if dynamic_obj_func is provided)
         if dynamic_obj_func is not None:

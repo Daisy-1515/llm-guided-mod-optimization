@@ -435,6 +435,7 @@ class TestBCDFinalDiagnostics:
                 f_edge={0: {0: {t: 1.0 for t in simple_scenario.time_slots}}},
                 total_comp_energy={0: 1.0},
                 diagnostics={"binding_slots": 0},
+                objective_value=0.0,
             )
 
         def fake_solve_trajectory_sca(*args, **kwargs):
