@@ -189,6 +189,15 @@ def solve_trajectory_sca(
 
             q_candidate = _extract_trajectory_solution(q_var, scenario, T)
             q_candidate = _project_trajectory_to_bounds(q_candidate, scenario)
+
+            # Velocity constraint verification after projection
+            velocity_ok = _verify_velocity_constraints(
+                q_candidate, traj_params.v_max, delta, scenario
+            )
+            if not velocity_ok:
+                # Reject candidate with velocity constraint violation
+                continue
+
             obj_true, comm_true, prop_true = _evaluate_true_objective(
                 scenario,
                 q_candidate,
@@ -273,6 +282,22 @@ def solve_trajectory_sca(
         include_terminal_hover=False,
     )
 
+    # Compute final trajectory velocity diagnostics
+    max_velocity = 0.0
+    for j in scenario.uavs:
+        if j not in q_ref:
+            continue
+        q_j = q_ref[j]
+        for t_idx in range(len(scenario.time_slots) - 1):
+            t_curr = scenario.time_slots[t_idx + 1]
+            t_prev = scenario.time_slots[t_idx]
+            if t_curr in q_j and t_prev in q_j:
+                x_curr, y_curr = q_j[t_curr]
+                x_prev, y_prev = q_j[t_prev]
+                dist = math.sqrt((float(x_curr) - float(x_prev)) ** 2 + (float(y_curr) - float(y_prev)) ** 2)
+                velocity = dist / delta
+                max_velocity = max(max_velocity, velocity)
+
     return TrajectoryResult(
         q=q_ref,
         objective_value=obj_history[-1],
@@ -295,6 +320,11 @@ def solve_trajectory_sca(
             "min_inter_uav_distance_slot": final_safety_diag["min_inter_uav_distance_slot"],
             "violated_safe_slots": final_safety_diag["violated_safe_slots"],
             "final_safety_passed": _safety_diagnostics_pass(final_safety_diag),
+            "velocity_check_enabled": True,
+            "velocity_check_tolerance": 1.01,
+            "final_max_velocity": max_velocity,
+            "velocity_constraint_ratio": max_velocity / traj_params.v_max if traj_params.v_max > 0 else 0.0,
+            "velocity_verified": max_velocity <= traj_params.v_max * 1.01,
         },
     )
 
@@ -418,6 +448,56 @@ def _project_trajectory_to_bounds(
         projected[j][last_t] = tuple(scenario.uavs[j].pos_final)
 
     return projected
+
+
+def _verify_velocity_constraints(
+    q: Trajectory2D,
+    v_max: float,
+    delta: float,
+    scenario: EdgeUavScenario,
+    tolerance: float = 1.01,
+) -> bool:
+    """Verify that all UAVs satisfy velocity constraints after trajectory extraction/projection.
+
+    Args:
+        q: Trajectory dict[j][t] = (x, y)
+        v_max: Maximum velocity (m/s)
+        delta: Time step interval (s)
+        scenario: EdgeUavScenario object
+        tolerance: Allow up to 1% numerical error (default 1.01)
+
+    Returns:
+        bool: True if all velocity constraints satisfied, False otherwise.
+    """
+    if v_max <= 0:
+        return True  # No velocity constraint
+
+    for j in scenario.uavs:
+        if j not in q:
+            continue
+
+        q_j = q[j]
+        time_slots = scenario.time_slots
+
+        for t_idx in range(len(time_slots) - 1):
+            t_curr = time_slots[t_idx + 1]
+            t_prev = time_slots[t_idx]
+
+            if t_curr not in q_j or t_prev not in q_j:
+                continue
+
+            x_curr, y_curr = q_j[t_curr]
+            x_prev, y_prev = q_j[t_prev]
+
+            dx = float(x_curr) - float(x_prev)
+            dy = float(y_curr) - float(y_prev)
+            dist = math.sqrt(dx**2 + dy**2)
+            velocity = dist / delta
+
+            if velocity > v_max * tolerance:
+                return False
+
+    return True
 
 
 def _extract_trajectory_solution(

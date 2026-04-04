@@ -656,3 +656,60 @@ def test_endpoint_reachability_constraint_4e(
             assert dist_sq <= max_dist ** 2 + 1e-3, (
                 f"UAV {j} at t={t}: dist²={dist_sq:.4f} > max_dist²={max_dist**2:.4f}"
             )
+
+
+def test_velocity_constraints_satisfied_in_result(
+    base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
+):
+    """T17: Final optimized trajectory satisfies velocity constraints after projection."""
+    scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+
+    result = solve_trajectory_sca(
+        scenario, {}, {}, q_init, params, traj_params,
+        max_sca_iter=10,
+    )
+
+    delta = float(scenario.meta.get('delta', 0.5))
+
+    # Check that diagnostics include velocity info
+    assert result.diagnostics['velocity_check_enabled'] is True
+    assert result.diagnostics['velocity_verified'] is True
+    assert result.diagnostics['final_max_velocity'] <= traj_params.v_max * 1.01
+
+    # Manually verify all trajectory points satisfy velocity constraint
+    for j in scenario.uavs:
+        q_j = result.q[j]
+        time_slots = scenario.time_slots
+        for t_idx in range(len(time_slots) - 1):
+            t_curr = time_slots[t_idx + 1]
+            t_prev = time_slots[t_idx]
+            x_curr, y_curr = q_j[t_curr]
+            x_prev, y_prev = q_j[t_prev]
+            dist = math.sqrt((x_curr - x_prev) ** 2 + (y_curr - y_prev) ** 2)
+            velocity = dist / delta
+            assert velocity <= traj_params.v_max * 1.01, (
+                f"UAV {j}: velocity={velocity:.2f} m/s exceeds "
+                f"v_max * 1.01 = {traj_params.v_max * 1.01:.2f} m/s"
+            )
+
+
+def test_velocity_constraint_ratio_diagnostic(
+    base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
+):
+    """T18: Velocity constraint ratio diagnostic is properly computed."""
+    scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+
+    result = solve_trajectory_sca(
+        scenario, {}, {}, q_init, params, traj_params,
+        max_sca_iter=5,
+    )
+
+    # Verify diagnostic ratio is correct
+    ratio = result.diagnostics['velocity_constraint_ratio']
+    max_vel = result.diagnostics['final_max_velocity']
+    assert np.isclose(ratio, max_vel / traj_params.v_max, rtol=1e-6), (
+        f"ratio={ratio} != final_max_velocity / v_max = {max_vel / traj_params.v_max}"
+    )
+    assert 0.0 <= ratio <= 1.01, f"velocity_constraint_ratio {ratio} should be in [0, 1.01]"
