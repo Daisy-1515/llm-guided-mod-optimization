@@ -214,8 +214,8 @@ class OffloadingModel:
     def setupVars(self):
         """创建二进制决策变量。
 
-        为所有活跃任务无条件创建 x_local 和 x_offload 变量，
-        让优化器自由选择所有分配选项（超时通过 D/τ > 1 自然反映在目标值中）。
+        为所有活跃任务无条件创建 x_local 和 x_offload 变量；
+        不可行分配由 setupCons L1-C2 强制置零。
         """
         print("Create Variables for Offloading Model!")
         self.x_local = {}
@@ -243,6 +243,7 @@ class OffloadingModel:
         """建立模型约束。
 
         L1-C1：每个活跃 (i,t) 在对应时隙中恰好分配到一个目标（本地或某架 UAV）。
+        L1-C2：卸载时延不超过截止期（硬约束）；本地执行无硬性约束（超时反映在目标值中）。
         L1-C3：若 UAV 设置了最大承载量 N_max，则每时隙分配数不超过上限（可选）。
         """
         print("Create Constraints for Offloading Model!")
@@ -261,6 +262,19 @@ class OffloadingModel:
                     self.x_local[i, t] + offload_sum == 1,
                     name=f"C1_assign_{i}_{t}",
                 )
+
+        # (L1-C2) 卸载时延硬约束：若卸载时延超过截止期，禁止该 (i,j,t) 卸载
+        # 本地执行无硬性约束（设备始终可本地执行，超时反映在目标值中）
+        for i in self.taskList:
+            for t in self.timeList:
+                if not self.task[i].active[t]:
+                    continue
+                for j in self.uavList:
+                    if not self._offload_feasible(i, j, t) and (i, j, t) in self.x_offload:
+                        self.model.addConstr(
+                            self.x_offload[i, j, t] == 0,
+                            name=f"C2_offload_infeas_{i}_{j}_{t}",
+                        )
 
         # (L1-C3) 可选 UAV 每时隙承载量上限
         for j in self.uavList:
