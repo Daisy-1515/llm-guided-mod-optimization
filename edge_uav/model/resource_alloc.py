@@ -1,15 +1,13 @@
-"""Block C resource allocation — Level 2a frequency optimization.
+"""Block C 资源分配 — Level 2a 频率优化.
 
-Given fixed offloading decisions x and UAV trajectories q, solve for
-optimal CPU frequencies (f_local, f_edge) that minimise weighted delay
-plus energy.
+给定固定的卸载决策 x 和无人机轨迹 q，求解最优 CPU 频率 (f_local, f_edge)，以最小化加权延迟和能量之和。
 
-Objective (Eq. 3-20):
+目标函数 (Eq. 3-20):
     min_f  Σ_{j,i,t} [ α·F_i/(f·τ_i) + γ_w·γ_j·f²·F_i/E_max ]
     s.t.   Σ_i f_ji^t ≤ f_max_j   ∀ j, t
            f_ji^t ≥ eps_freq
 
-Solver: closed-form KKT + dual bisection when capacity binds.
+求解器：闭式 KKT + 容量受限时的对偶二分法。
 """
 
 from __future__ import annotations
@@ -24,22 +22,22 @@ __all__ = [
     "solve_resource_allocation",
 ]
 
-_MAX_OUTER_BISECT = 200   # dual variable range can span 30+ orders of magnitude
-_MAX_INNER_BISECT = 60    # frequency range [eps_freq, f_max] — 60 halves suffice
-_G_REL_TOL = 1e-10        # outer convergence: |g(ν) - f_max| / f_max < tol
+_MAX_OUTER_BISECT = 200   # 对偶变量范围可能跨越 30 多个数量级
+_MAX_INNER_BISECT = 60    # 频率范围 [eps_freq, f_max] — 60 次二分足够
+_G_REL_TOL = 1e-10        # 外部收敛条件: |g(ν) - f_max| / f_max < tol
 
 
 @dataclass(frozen=True)
 class ResourceAllocResult:
-    """Block C solver output.
+    """Block C 求解器输出。
 
-    Attributes:
-        f_local: dict[i][t] — local CPU frequency (Hz), always task.f_local.
-        f_edge:  dict[j][i][t] — edge CPU frequency (Hz), KKT-optimal.
-        objective_value: L2a-obj (delay + energy terms for offloaded tasks).
-        total_comp_energy: {j: float} — per-UAV total computation energy (J),
-            for BCD wrapper to check energy budget constraint (Eq. 3-25).
-        diagnostics: binding_slots, total_bisect_iters, max_bisect_iters.
+    属性:
+        f_local: dict[i][t] — 本地 CPU 频率 (Hz)，始终为 task.f_local。
+        f_edge:  dict[j][i][t] — 边缘 CPU 频率 (Hz)，KKT 最优解。
+        objective_value: L2a目标值 (已卸载任务的延迟 + 能量项)。
+        total_comp_energy: {j: float} — 每架无人机的总计算能量 (J)，
+            用于 BCD 循环中检查能量预算约束 (Eq. 3-25)。
+        diagnostics: binding_slots, total_bisect_iters, max_bisect_iters 用于记录诊断信息。
     """
 
     f_local: Scalar2D
@@ -50,7 +48,7 @@ class ResourceAllocResult:
 
 
 # ------------------------------------------------------------------
-# Public API
+# 公共 API
 # ------------------------------------------------------------------
 
 def solve_resource_allocation(
@@ -61,21 +59,21 @@ def solve_resource_allocation(
     alpha: float,
     gamma_w: float,
 ) -> ResourceAllocResult:
-    """Solve Block C: optimal frequency allocation for given offloading.
+    """求解 Block C：针对给定的卸载决策进行最优频率分配。
 
-    Args:
-        scenario: Edge UAV scenario data.
-        offloading_decisions: OffloadingModel.getOutputs() format —
-            ``{t: {"local": [i...], "offload": {j: [i...]}}}``.
-        params: Physical parameters (gamma_j, eps_freq used here).
-        alpha: Delay weight (> 0, keyword-only).
-        gamma_w: Energy scaling factor (> 0, keyword-only).
+    参数:
+        scenario: 边缘无人机场景数据。
+        offloading_decisions: OffloadingModel.getOutputs() 的返回格式 —
+            ``{t: {"local": [i...], "offload": {j: [i...]}}}``。
+        params: 物理参数 (此处使用 gamma_j, eps_freq)。
+        alpha: 延迟权重 (> 0, 仅限关键字参数)。
+        gamma_w: 能量缩放因子 (> 0, 仅限关键字参数)。
 
-    Returns:
-        ResourceAllocResult with f_local, f_edge, objective, diagnostics.
+    返回:
+        带有 f_local, f_edge, objective, diagnostics 的 ResourceAllocResult 对象。
 
-    Raises:
-        ValueError: On invalid alpha / gamma_w / gamma_j.
+    抛出:
+        ValueError: 当 alpha / gamma_w / gamma_j 无效时。
     """
     if alpha <= 0:
         raise ValueError(f"alpha must be > 0, got {alpha}")
@@ -86,13 +84,13 @@ def solve_resource_allocation(
 
     offload_sets = _parse_offload_sets(offloading_decisions, scenario)
 
-    # f_local: always task.f_local (no local energy term ⇒ max freq optimal)
+    # f_local: 始终为 task.f_local (无本地能量项 ⇒ 最大频率即为最优)
     f_local: Scalar2D = {
         i: {t: task.f_local for t in scenario.time_slots}
         for i, task in scenario.tasks.items()
     }
 
-    # f_edge: store as [j][i][t]; solve per (j, t) slot via KKT + dual bisection
+    # f_edge: 存储为 [j][i][t]；针对每个 (j, t) 时隙使用 KKT + 对偶二分法求解
     f_edge: Scalar3D = {j: {i: {} for i in scenario.tasks} for j in scenario.uavs}
     diag = {"binding_slots": 0, "total_bisect_iters": 0, "max_bisect_iters": 0}
 
@@ -101,7 +99,7 @@ def solve_resource_allocation(
         for t, task_ids in slot_map.items():
             if not task_ids:
                 continue
-            # Eq. 3-20 coefficients: a_i = α·F_i/τ_i, b_i = γ_w·γ_j·F_i/E_max
+            # Eq. 3-20 系数: a_i = α·F_i/τ_i, b_i = γ_w·γ_j·F_i/E_max
             specs = []
             for i in task_ids:
                 task = scenario.tasks[i]
@@ -121,7 +119,7 @@ def solve_resource_allocation(
     obj = _compute_objective(f_edge, offload_sets, scenario, params,
                              alpha=alpha, gamma_w=gamma_w)
 
-    # Eq. 3-25: per-UAV total computation energy for BCD feasibility check
+    # Eq. 3-25: 计算每架无人机的总计算能量，用于验证 BCD 可行性
     comp_energy = _compute_comp_energy(f_edge, offload_sets, scenario, params)
 
     return ResourceAllocResult(
@@ -132,17 +130,17 @@ def solve_resource_allocation(
 
 
 # ------------------------------------------------------------------
-# Internal helpers
+# 内部辅助函数
 # ------------------------------------------------------------------
 
 def _parse_offload_sets(
     outputs: dict,
     scenario: EdgeUavScenario,
 ) -> dict[int, dict[int, list[int]]]:
-    """Extract per-UAV per-slot task lists from offloading decisions.
+    """从卸载决策中提取每架无人机每个时隙的任务列表。
 
-    Returns:
-        {j: {t: [i, ...]}} — tasks offloaded to UAV j at slot t.
+    返回:
+        {j: {t: [i, ...]}} — 时隙 t 卸载给无人机 j 的任务。
     """
     sets: dict[int, dict[int, list[int]]] = {j: {} for j in scenario.uavs}
     for t in scenario.time_slots:
@@ -162,19 +160,19 @@ def _solve_slot_kkt(
     f_max: float,
     eps_freq: float,
 ) -> tuple[dict[int, float], int]:
-    """KKT solver for one (j, t) slot.
+    """针对单个 (j, t) 时隙的 KKT 求解器。
 
-    Phase 1: unconstrained solution f_i* = (a_i / (2·b_i))^(1/3).
-    Phase 2: if Σf_i* ≤ f_max, return directly.
-    Phase 3: dual bisection on ν so that Σ f_i(ν) = f_max.
+    第 1 阶段: 求解无约束最优解 f_i* = (a_i / (2·b_i))^(1/3)。
+    第 2 阶段: 如果 Σf_i* ≤ f_max，则直接返回该解。
+    第 3 阶段: 针对容量受限，通过对偶二分法求解 ν，使得 Σ f_i(ν) = f_max。
 
-    Returns:
-        ({i: f_i*}, n_bisect_iters).
+    返回:
+        ({i: f_i*}, n_bisect_iters)。
     """
     if not specs:
         return {}, 0
 
-    # Phase 1: unconstrained KKT — Eq. 3-20 with ν = 0
+    # 第 1 阶段: 无约束 KKT — 即 Eq. 3-20 且 ν = 0
     unc = {}
     total = 0.0
     for i, a_i, b_i in specs:
@@ -182,18 +180,17 @@ def _solve_slot_kkt(
         unc[i] = f_i
         total += f_i
 
-    # Phase 2: feasibility check
+    # 第 2 阶段: 可行性检查
     if total <= f_max:
         clamped = {i: max(eps_freq, min(f_max, f)) for i, f in unc.items()}
-        # Post-clamp check: eps_freq lift could violate capacity
+        # 裁剪后的检查：由于 eps_freq 的下限限制，可能导致总和超出容量
         if sum(clamped.values()) <= f_max:
             return clamped, 0
-        # Fall through to dual bisection
+        # 如果超出，则继续进入对偶二分法阶段
 
-    # Phase 3: dual bisection — find ν > 0 s.t. g(ν) = Σ f_i(ν) = f_max
-    #   ν range can span 30+ orders of magnitude (e.g. [0, 2e33] when
-    #   gamma_j ≈ 1e-28), so converge on g(ν) relative to f_max instead
-    #   of absolute ν tolerance.
+    # 第 3 阶段: 对偶二分法 — 寻找 ν > 0 使得 g(ν) = Σ f_i(ν) = f_max
+    #   ν 范围可能跨越 30 多个数量级 (例如，当 gamma_j ≈ 1e-28 时，范围在 [0, 2e33])，
+    #   因此，收敛条件基于相对于 f_max 的 g(ν) 变化，而不是 ν 的绝对公差。
     nu_lo = 0.0
     nu_hi = max(a for _, a, _ in specs) / (eps_freq ** 2)
 
@@ -227,10 +224,10 @@ def _freq_at_dual(
     f_max: float,
     eps_freq: float,
 ) -> float:
-    """Solve  2b·f³ + ν·f²  − a = 0  for f ∈ [eps_freq, f_max].
+    """求解  2b·f³ + ν·f²  − a = 0，使得 f ∈ [eps_freq, f_max]。
 
-    The LHS h(f) = 2b·f³ + ν·f² − a is strictly increasing for f > 0,
-    so binary search is guaranteed to converge.
+    等式左侧 h(f) = 2b·f³ + ν·f² − a 在 f > 0 时严格单调递增，
+    因此二分查找能够保证收敛。
     """
     def h(f: float) -> float:
         return 2.0 * b * f * f * f + nu * f * f - a
@@ -261,9 +258,9 @@ def _compute_objective(
     alpha: float,
     gamma_w: float,
 ) -> float:
-    """L2a objective: Σ [ α·F/(f·τ) + γ_w·γ_j·f²·F/E_max ].
+    """L2a 目标函数: Σ [ α·F/(f·τ) + γ_w·γ_j·f²·F/E_max ]。
 
-    Only frequency-dependent terms; communication delay is external.
+    仅包含与频率相关的项；通信延迟作为外部参数给定。
     """
     obj = 0.0
     for j, slot_map in offload_sets.items():
@@ -275,7 +272,7 @@ def _compute_objective(
                 if f is None or f <= 0.0:
                     continue
                 task = scenario.tasks[i]
-                # Eq. 3-20: delay term + energy term
+                # Eq. 3-20: 延迟项 + 能量项
                 obj += alpha * task.F / (f * task.tau)
                 obj += gamma_w * params.gamma_j * f * f * task.F / uav.E_max
     return obj
@@ -287,9 +284,9 @@ def _compute_comp_energy(
     scenario: EdgeUavScenario,
     params: PrecomputeParams,
 ) -> dict[int, float]:
-    """Per-UAV total computation energy: Σ_{i,t} γ_j · f² · F_i.
+    """计算每架无人机的总计算能量: Σ_{i,t} γ_j · f² · F_i。
 
-    For BCD wrapper to check Eq. 3-25: E_comp_j + E_fly_j ≤ E_max_j.
+    供 BCD 模型检查 Eq. 3-25 可行性: E_comp_j + E_fly_j ≤ E_max_j。
     """
     energy: dict[int, float] = {j: 0.0 for j in scenario.uavs}
     for j, slot_map in offload_sets.items():
