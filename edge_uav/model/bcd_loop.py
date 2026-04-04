@@ -247,7 +247,9 @@ def check_trajectory_monotonicity(
     meta = scenario.meta or {}
     x_max = float(meta.get("x_max", 1e6))
     y_max = float(meta.get("y_max", 1e6))
-    delta_t = float(getattr(config, "delta_t", 1.0))  # time slot duration (s)
+    delta_t = float(
+        getattr(config, "delta", getattr(config, "delta_t", meta.get("delta", 1.0)))
+    )  # time slot duration (s)
     v_max = float(getattr(config, "v_traj_max", getattr(config, "v_U_max", getattr(config, "v_max", 30.0))))  # m/s
 
     errors: List[str] = []

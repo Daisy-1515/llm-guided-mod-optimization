@@ -20,7 +20,7 @@ from unittest.mock import Mock, patch
 
 from config.config import configPara
 from edge_uav.data import ComputeTask, UAV, EdgeUavScenario
-from edge_uav.model.bcd_loop import run_bcd_loop
+from edge_uav.model.bcd_loop import check_trajectory_monotonicity, run_bcd_loop
 from edge_uav.model.precompute import Level2Snapshot, PrecomputeParams, PrecomputeResult
 from edge_uav.model.trajectory_opt import TrajectoryOptParams, TrajectoryResult
 
@@ -492,3 +492,38 @@ class TestBCDFinalDiagnostics:
             == "iteration_0"
         )
         assert result.solution_details["final_precompute_diagnostics_fallback"] is False
+
+
+def test_check_trajectory_monotonicity_uses_config_delta():
+    """Velocity re-check must use config.delta when delta_t is absent."""
+    scenario = EdgeUavScenario(
+        tasks={},
+        uavs={
+            0: UAV(
+                index=0,
+                pos=(0.0, 0.0),
+                pos_final=(10.0, 0.0),
+                E_max=100.0,
+                f_max=4e9,
+            )
+        },
+        time_slots=[0, 1],
+        seed=42,
+        meta={"x_max": 100.0, "y_max": 100.0, "delta": 0.5},
+    )
+    q_result = TrajectoryResult(
+        q={0: {0: (0.0, 0.0), 1: (10.0, 0.0)}},
+        objective_value=1.0,
+        total_comm_delay=0.0,
+        total_prop_energy=1.0,
+        per_uav_energy={0: 1.0},
+        sca_iterations=1,
+        converged=True,
+        solver_status="optimal",
+        max_safe_slack=0.0,
+        diagnostics={},
+    )
+    config = SimpleNamespace(delta=0.5, v_traj_max=15.0)
+
+    with pytest.raises(ValueError, match="velocity"):
+        check_trajectory_monotonicity(q_result, scenario, config)
