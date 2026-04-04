@@ -267,8 +267,8 @@ def check_trajectory_monotonicity(
 
             x, y = q_j[t]
 
-            # Check bounds (allow 1e-9 tolerance for floating-point rounding)
-            _eps = 1e-9
+            # Allow small numerical drift from conic solvers near the map boundary.
+            _eps = 1e-3
             if not (-_eps <= x <= x_max + _eps and -_eps <= y <= y_max + _eps):
                 errors.append(f"UAV {j}, t={t}: position ({x}, {y}) out of bounds")
 
@@ -478,6 +478,9 @@ def run_bcd_loop(
     solution_details: Dict[str, Any] = {
         "sca_converged": False,
         "max_safe_slack": 0.0,
+        "min_inter_uav_distance": None,
+        "min_inter_uav_distance_slot": None,
+        "violated_safe_slots": [],
         "resource_binding_slots": 0,
         "total_rollbacks": 0,
         "final_sca_iterations": 0,
@@ -570,7 +573,7 @@ def run_bcd_loop(
                 traj_params,
                 max_sca_iter=int(getattr(config, "max_sca_iter", 100)),
                 eps_sca=float(getattr(config, "eps_sca", 1e-3)),
-                safe_slack_penalty=float(getattr(config, "safe_slack_penalty", 1e3)),
+                safe_slack_penalty=float(getattr(config, "safe_slack_penalty", 1e6)),
                 alpha=float(getattr(config, "alpha", 1.0)),
                 lambda_w=float(getattr(config, "lambda_w", 1.0)),
             )
@@ -579,6 +582,15 @@ def run_bcd_loop(
             )
             solution_details["sca_converged"] = traj_result.converged
             solution_details["max_safe_slack"] = traj_result.max_safe_slack
+            solution_details["min_inter_uav_distance"] = traj_result.diagnostics.get(
+                "min_inter_uav_distance"
+            )
+            solution_details["min_inter_uav_distance_slot"] = traj_result.diagnostics.get(
+                "min_inter_uav_distance_slot"
+            )
+            solution_details["violated_safe_slots"] = traj_result.diagnostics.get(
+                "violated_safe_slots", []
+            )
             solution_details["final_sca_iterations"] = traj_result.sca_iterations
             logger.info(
                 f"Level 2b trajectory optimized "

@@ -158,7 +158,7 @@ def test_run_bcd_loop_passes_configured_sca_controls():
             offloading_model.return_value.getOutputs.return_value = offloading_outputs
             offloading_model.return_value.gap = 0.0
 
-            run_bcd_loop(
+            result = run_bcd_loop(
                 scenario=scenario,
                 config=config,
                 params=params,
@@ -174,3 +174,6 @@ def test_run_bcd_loop_passes_configured_sca_controls():
     assert kwargs["max_sca_iter"] == 7
     assert kwargs["eps_sca"] == 5e-4
     assert kwargs["safe_slack_penalty"] == 321.0
+    assert result.solution_details["min_inter_uav_distance"] is None
+    assert result.solution_details["min_inter_uav_distance_slot"] is None
+    assert result.solution_details["violated_safe_slots"] == []

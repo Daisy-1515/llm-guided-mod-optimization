@@ -94,7 +94,7 @@ class configPara:
         self.d_safe_traj = 5.0          # 轨迹优化安全距离 (m)
         self.max_sca_iter = 5           # SCA 最大迭代数
         self.eps_sca = 1e-3             # SCA 收敛容差
-        self.safe_slack_penalty = 1e3   # 安全距离松弛罚项权重
+        self.safe_slack_penalty = 1e6   # 安全距离松弛罚项权重
 
         # 场景规模
         self.numTasks = 10      # 终端设备数

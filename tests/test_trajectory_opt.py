@@ -525,6 +525,10 @@ def test_trajectory_result_fields_complete(
     assert "total_prop_energy_history" in result.diagnostics
     assert "sca_times" in result.diagnostics
     assert "solver_status_history" in result.diagnostics
+    assert "min_inter_uav_distance" in result.diagnostics
+    assert "min_inter_uav_distance_slot" in result.diagnostics
+    assert "violated_safe_slots" in result.diagnostics
+    assert "final_safety_passed" in result.diagnostics
 
     # No-offload case: comm_delay=0, so objective == lambda_w(=1) * prop_energy
     assert np.isclose(result.objective_value, result.total_prop_energy, rtol=1e-6)
