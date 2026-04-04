@@ -1,8 +1,10 @@
 """Block D trajectory optimization — Level 2b SCA + CVXPY SOCP.
 
 Given fixed offloading decisions x and resource allocation f_edge, solve for
-optimal UAV trajectories q that minimize propulsion energy subject to:
+optimal UAV trajectories q that jointly minimize communication delay + propulsion
+energy subject to:
   - Map boundary, initial/final position, and velocity constraints (convex)
+  - Endpoint reachability constraints (4e)
   - Communication delay constraints (convex via successive approximation)
   - Safe separation constraints (non-convex, linearized via SCA with slack)
 
@@ -55,15 +57,19 @@ class TrajectoryResult:
 
     Attributes:
         q: Optimized trajectory dict[j][t] = (x, y) (m)
-        objective_value: True total propulsion energy (J) — evaluated post-SCA.
-        per_uav_energy: Energy per UAV (J), dict[j] -> float
+        objective_value: Complete L2b cost = alpha*total_comm_delay + lambda_w*total_prop_energy
+        total_comm_delay: Total communication delay Σ D_l/r_up + D_r/r_down (s)
+        total_prop_energy: Total propulsion energy Σ_j E_prop_j (J)
+        per_uav_energy: Propulsion energy per UAV (J), dict[j] -> float
         sca_iterations: Number of SCA iterations performed (1 <= k <= max_sca_iter)
         converged: True if relative gap <= eps_sca, False if max_sca_iter reached
         solver_status: Final CVXPY solver status (e.g., 'optimal', 'optimal_inaccurate')
         max_safe_slack: Largest safety constraint slack at final iteration (m²)
                        > 0 indicates initial trajectory was unsafe
         diagnostics: dict with keys:
-            - 'true_objective_history': list[float] — true energy per SCA iteration
+            - 'true_objective_history': list[float] — true L2b cost per SCA iteration
+            - 'total_comm_delay_history': list[float] — comm delay per iteration (s)
+            - 'total_prop_energy_history': list[float] — prop energy per iteration (J)
             - 'surrogate_history': list[float] — CVXPY objective values
             - 'solver_status_history': list[str]
             - 'max_slack_history': list[float]
@@ -71,6 +77,8 @@ class TrajectoryResult:
     """
     q: Trajectory2D
     objective_value: float
+    total_comm_delay: float
+    total_prop_energy: float
     per_uav_energy: dict[int, float]
     sca_iterations: int
     converged: bool
@@ -91,12 +99,16 @@ def solve_trajectory_sca(
     eps_sca: float = 1e-3,
     safe_slack_penalty: float = 1e3,
     solver_fallback: tuple[str, ...] = ("CLARABEL", "ECOS", "SCS"),
+    alpha: float = 1.0,
+    lambda_w: float = 1.0,
 ) -> TrajectoryResult:
     """Solve trajectory optimization via SCA + SOCP.
 
     Args:
         scenario: EdgeUavScenario with map, UAVs, tasks, and meta parameters
-        offloading_decisions: dict (not used directly here, kept for API consistency)
+        offloading_decisions: dict {t: {"local": [i...], "offload": {j: [i...]}}}
+                             If non-empty, used as authority for active offload set.
+                             If empty dict {}, falls back to f_fixed traversal.
         f_fixed: dict[j][i][t] -> float, edge CPU frequency (Hz) from Step 2
         q_init: Initial trajectory dict[j][t] = (x, y)
         params: PrecomputeParams (distances, rates, time slot duration δ)
@@ -105,9 +117,11 @@ def solve_trajectory_sca(
         eps_sca: Relative convergence tolerance (default 1e-3)
         safe_slack_penalty: Penalty weight for safe distance slack (default 1e3)
         solver_fallback: Solvers to try in order (default CLARABEL → ECOS → SCS)
+        alpha: Communication delay objective weight (default 1.0)
+        lambda_w: Propulsion energy objective weight (default 1.0)
 
     Returns:
-        TrajectoryResult with optimized trajectory, energy, and diagnostics.
+        TrajectoryResult with optimized trajectory, combined L2b cost, and diagnostics.
 
     Raises:
         ValueError: If input is infeasible (endpoint distance > capacity, missing f_edge, etc.)
@@ -135,7 +149,7 @@ def solve_trajectory_sca(
             )
 
     # Extract active offloads for communication constraints
-    active_offloads = _extract_active_offloads(scenario, f_fixed)
+    active_offloads = _extract_active_offloads(scenario, offloading_decisions, f_fixed)
 
     # Pre-check communication feasibility: ensure τ_comm > 0 for all active pairs
     for j, i, t in active_offloads:
@@ -163,6 +177,8 @@ def solve_trajectory_sca(
     # ========== Step 1: SCA loop ==========
     q_ref = q_init
     obj_history = []
+    comm_history = []
+    prop_history = []
     surrogate_history = []
     solver_status_history = []
     slack_history = []
@@ -175,7 +191,8 @@ def solve_trajectory_sca(
         try:
             problem, q_var, slack_safe, obj_surrogate = _build_sca_subproblem(
                 scenario, q_ref, f_fixed, params, traj_params,
-                active_offloads, safe_slack_penalty
+                active_offloads, safe_slack_penalty,
+                alpha=alpha, lambda_w=lambda_w,
             )
         except Exception as e:
             raise ValueError(f"Failed to build SOCP subproblem at SCA iter {sca_k}: {e}")
@@ -209,8 +226,9 @@ def solve_trajectory_sca(
                 q_new_dict[j][t] = (float(x_val), float(y_val))
 
         # Evaluate true objective at q_new
-        obj_true = _evaluate_true_objective(
-            scenario, q_new_dict, traj_params, params
+        obj_true, comm_true, prop_true = _evaluate_true_objective(
+            scenario, q_new_dict, traj_params, params,
+            active_offloads, alpha=alpha, lambda_w=lambda_w,
         )
 
         # Check max safe slack
@@ -219,6 +237,8 @@ def solve_trajectory_sca(
 
         # Record history
         obj_history.append(obj_true)
+        comm_history.append(comm_true)
+        prop_history.append(prop_true)
         surrogate_history.append(problem.value if problem.value is not None else np.inf)
         solver_status_history.append(solver_status)
         slack_history.append(max_slack)
@@ -253,6 +273,8 @@ def solve_trajectory_sca(
     result = TrajectoryResult(
         q=q_ref,
         objective_value=obj_history[-1],
+        total_comm_delay=comm_history[-1],
+        total_prop_energy=prop_history[-1],
         per_uav_energy=per_uav_energy,
         sca_iterations=len(obj_history),
         converged=converged,
@@ -260,6 +282,8 @@ def solve_trajectory_sca(
         max_safe_slack=slack_history[-1] if slack_history else 0.0,
         diagnostics={
             "true_objective_history": obj_history,
+            "total_comm_delay_history": comm_history,
+            "total_prop_energy_history": prop_history,
             "surrogate_history": surrogate_history,
             "solver_status_history": solver_status_history,
             "max_slack_history": slack_history,
@@ -341,7 +365,11 @@ def _validate_initial_trajectory(
             if dist > max_dist + 1e-9:
                 return False, f"UAV {j} at t={t}: ||Δq||={dist:.2f}m > v_max·δ={max_dist:.2f}m"
 
-    # Check safe distance (only interim slots, not endpoints)
+    # Check safe distance — endpoint exemption (design assumption):
+    # All UAVs share a common depot (takeoff and landing point), so t=0 and t=T-1
+    # are intentionally exempt from the safe-distance check. Enforcing d_safe at
+    # shared endpoints would make the problem artificially infeasible.
+    # Effective domain: 0 < t < T-1 (interim slots only).
     if traj_params.d_safe > 0:
         for j in scenario.uavs:
             for k in scenario.uavs:
@@ -349,8 +377,7 @@ def _validate_initial_trajectory(
                     continue
                 q_j = q_init[j]
                 q_k = q_init[k]
-                # Check only 0 < t < T-1
-                for t in range(1, T - 1):
+                for t in range(1, T - 1):  # interim slots only; endpoints exempt
                     delta_q = np.array(q_j[t]) - np.array(q_k[t])
                     dist = np.linalg.norm(delta_q)
                     if dist < traj_params.d_safe - 1e-9:
@@ -364,19 +391,70 @@ def _validate_initial_trajectory(
 
 def _extract_active_offloads(
     scenario: EdgeUavScenario,
+    offloading_decisions: dict,
     f_fixed: dict,
 ) -> list[tuple[int, int, int]]:
     """Extract (j, i, t) triples where task i is offloaded to UAV j at slot t.
 
+    If offloading_decisions is non-empty, uses it as the authority for the active
+    offload set and validates consistency with f_fixed. If offloading_decisions is
+    an empty dict {}, falls back to traversing f_fixed directly.
+
+    Args:
+        scenario: EdgeUavScenario (unused, kept for API)
+        offloading_decisions: {t: {"local": [i...], "offload": {j: [i...]}}}
+                             Empty dict {} triggers fallback to f_fixed.
+        f_fixed: dict[j][i][t] -> float, edge CPU frequency from Step 2
+
     Returns:
-        List of (j, i, t) tuples for which f_edge[j][i][t] is assigned.
+        List of (j, i, t) tuples for active offloads.
+
+    Raises:
+        ValueError: If offloading_decisions and f_fixed are inconsistent (when
+                   offloading_decisions is non-empty).
     """
-    active = []
+    # Fallback: empty offloading_decisions → use f_fixed as authority
+    if not offloading_decisions:
+        active = []
+        for j in f_fixed:
+            for i in f_fixed[j]:
+                for t in f_fixed[j][i]:
+                    if f_fixed[j][i][t] > 0:
+                        active.append((j, i, t))
+        return active
+
+    # Build declared set from offloading_decisions
+    declared: set[tuple[int, int, int]] = set()
+    for t, t_dict in offloading_decisions.items():
+        for j, task_list in t_dict.get("offload", {}).items():
+            for i in task_list:
+                declared.add((j, i, t))
+
+    # Build f_fixed positive set
+    f_fixed_positive: set[tuple[int, int, int]] = set()
     for j in f_fixed:
         for i in f_fixed[j]:
             for t in f_fixed[j][i]:
-                active.append((j, i, t))
-    return active
+                if f_fixed[j][i][t] > 0:
+                    f_fixed_positive.add((j, i, t))
+
+    # Validate: every declared (j,i,t) must have f_fixed > 0
+    missing_in_f_fixed = declared - f_fixed_positive
+    if missing_in_f_fixed:
+        raise ValueError(
+            f"offloading_decisions declares offloads but f_fixed has no positive entry: "
+            f"{sorted(missing_in_f_fixed)}"
+        )
+
+    # Validate: no residual allocation in f_fixed not covered by offloading_decisions
+    residual = f_fixed_positive - declared
+    if residual:
+        raise ValueError(
+            f"f_fixed has positive entries not declared in offloading_decisions (residual): "
+            f"{sorted(residual)}"
+        )
+
+    return sorted(declared)
 
 
 def _add_communication_delay_socp_constraint(
@@ -386,37 +464,30 @@ def _add_communication_delay_socp_constraint(
     rate_safe: cp.Expression,
     tau_comm_budget: float,
     *,
+    payload_bits: float = 1.0,
     name_suffix: str = "",
 ) -> None:
-    """Add DCP-compliant SOCP communication delay constraints.
+    """Add DCP-compliant communication delay constraint.
 
-    Rewrite
-        2 * sqrt(H^2 + ||pos_diff||_2^2) / rate_safe <= tau_comm_budget
-    into the SOCP-friendly form
-        ||[H, pos_diff[0], pos_diff[1]]||_2 <= s
-        2 * s <= tau_comm_budget * rate_safe
+    Constraint: (D_l + D_r) / rate_safe <= tau_comm_budget
+    Equivalent linear form (rate_safe is affine from Taylor LB):
+        payload_bits <= tau_comm_budget * rate_safe
 
-    The helper appends constraints directly to the mutable ``constraints`` list
-    because the CVXPY Problem object is assembled only after all constraints
-    have been collected.
+    Args:
+        constraints: Mutable list to append constraints to.
+        pos_diff: Unused after refactor (kept for call-site compatibility).
+        H: Unused after refactor (kept for call-site compatibility).
+        rate_safe: Affine lower bound on Shannon rate (bps).
+        tau_comm_budget: Communication time budget (s).
+        payload_bits: Total payload D_l + D_r (bits).
+        name_suffix: For debugging/identification.
     """
-    s_var = cp.Variable(
-        nonneg=True,
-        name=f"comm_dist_aux_{name_suffix}" if name_suffix else None,
-    )
-
-    # SOCP distance epigraph:
-    # sqrt(H^2 + ||pos_diff||_2^2) = ||[H, dx, dy]||_2 <= s
-    dist_vec = cp.hstack([H, pos_diff[0], pos_diff[1]])
-    constraints.append(cp.norm(dist_vec, 2) <= s_var)
-
-    # Keep the rate lower bound strictly positive so the delay surrogate
-    # remains well-defined in the SOCP reformulation.
+    # Keep the rate lower bound strictly positive as a safety guard.
     constraints.append(rate_safe >= 1e-12)
 
-    # Delay inequality:
-    # 2 * distance / rate <= tau  <=>  2 * distance <= tau * rate.
-    constraints.append(2.0 * s_var <= tau_comm_budget * rate_safe)
+    # Direct linear constraint: payload / rate <= tau
+    # <=> payload <= tau * rate  (DCP-compliant: affine <= affine)
+    constraints.append(payload_bits <= tau_comm_budget * rate_safe)
 
 
 def _add_safety_separation_socp_constraint(
@@ -455,6 +526,8 @@ def _build_sca_subproblem(
     traj_params: TrajectoryOptParams,
     active_offloads: list[tuple[int, int, int]],
     safe_slack_penalty: float,
+    alpha: float = 1.0,
+    lambda_w: float = 1.0,
 ) -> tuple[cp.Problem, dict, dict, cp.Expression]:
     """Build CVXPY SOCP subproblem at reference point q_ref.
 
@@ -523,6 +596,15 @@ def _build_sca_subproblem(
             # can become numerically unbounded for some parameter regimes.
             constraints.append(speed_sq[j][t] <= traj_params.v_max ** 2)
 
+    # (4e) Endpoint reachability: ||q_j[t] - pos_final||² <= (v_max*(T-1-t)*delta)²
+    for j in uavs:
+        pos_final_j = np.array(uavs[j].pos_final, dtype=float)
+        for t in range(T - 1):  # t=T-1 already covered by (4c), skip
+            remaining = T - 1 - t
+            max_dist = traj_params.v_max * remaining * delta
+            diff = q_var[j][t] - pos_final_j
+            constraints.append(cp.sum_squares(diff) <= max_dist ** 2)
+
     # Propulsion energy objective (from speed_sq)
     for j in uavs:
         for t in range(T - 1):
@@ -553,57 +635,72 @@ def _build_sca_subproblem(
             energy_contrib = power_ub * delta
             obj_propulsion += energy_contrib
 
-    # (4e) Communication delay constraint
-    # Get communication parameters from meta or use defaults
-    H = float(scenario.meta.get('H', 100.0))  # Height (m)
-    B_up = float(scenario.meta.get('B_up', 1e6))  # Uplink bandwidth (Hz)
-    SNR_default = 100.0  # Default SNR ratio
+    # Communication parameters from meta
+    H       = float(scenario.meta.get('H',     100.0))
+    B_up    = float(scenario.meta.get('B_up',    2e7))
+    B_down  = float(scenario.meta.get('B_down',  2e7))
+    P_i     = float(scenario.meta.get('P_i',     0.5))
+    P_j     = float(scenario.meta.get('P_j',     1.0))
+    rho_0   = float(scenario.meta.get('rho_0',  1e-5))
+    N_0     = float(scenario.meta.get('N_0',   1e-10))
+    beta      = P_i * rho_0 / N_0   # uplink SNR coefficient
+    beta_down = P_j * rho_0 / N_0   # downlink SNR coefficient
+
+    # Communication surrogate objective + deadline constraints
+    obj_comm_surrogate = cp.Constant(0)
 
     for j, i, t in active_offloads:
         tau_i = tasks[i].tau
         F_i = tasks[i].F
-
         f_edge_jit = f_fixed[j][i][t]
         tau_comm_budget = tau_i - F_i / f_edge_jit
 
-        # Communication delay ≤ τ_comm_budget
-        # Delay = 2√(H² + ||q_j - w_i||²) / r(H² + ||q_j - w_i||²)
-        # Use lower bound on rate + inv_pos
-
         # Position of task device on the ground
         w_i = tuple(tasks[i].pos)
-
-        # Horizontal position difference from UAV j to task device for task i
         pos_diff = q_var[j][t] - np.array(w_i, dtype=float)
 
-        # Rate lower bound (using pre-computed reference from q_ref)
-        z_ref = np.sum(
-            (np.array(q_ref[j][t], dtype=float) - np.array(w_i, dtype=float)) ** 2
-        ) + H ** 2
-        z_ref = max(z_ref, 1e-12)
-
-        rate_safe = _rate_lower_bound_expr(
-            cp.sum_squares(pos_diff) + H ** 2,
-            z_ref,
-            H,
-            B_up,
-            SNR_default,
+        # z = ||q_j[t] - w_i||² + H²  (convex in q_var)
+        z_expr = cp.sum_squares(pos_diff) + H ** 2
+        z_ref = max(
+            np.sum((np.array(q_ref[j][t], dtype=float) - np.array(w_i, dtype=float)) ** 2) + H ** 2,
+            1e-12
         )
 
-        # Rewrite the communication delay constraint in SOCP form to avoid
-        # the non-DCP product sqrt(z) * inv_pos(rate_safe).
+        # Uplink rate lower bound (first-order Taylor)
+        r_up_lb = _rate_lower_bound_expr(z_expr, z_ref, H, B_up, beta)
+        r_up_ref = max((B_up / np.log(2)) * np.log(1 + beta / z_ref), 1e-12)
+
+        # Downlink rate lower bound (same form, different parameters)
+        r_down_lb = _rate_lower_bound_expr(z_expr, z_ref, H, B_down, beta_down)
+        r_down_ref = max((B_down / np.log(2)) * np.log(1 + beta_down / z_ref), 1e-12)
+
+        # Communication delay surrogate objective (DCP: negative constant × concave = convex)
+        # Proxy for minimizing D_l/r_up + D_r/r_down via SCA
+        D_l_i = float(tasks[i].D_l)
+        D_r_i = float(tasks[i].D_r)
+        obj_comm_surrogate = obj_comm_surrogate \
+            - (D_l_i / r_up_ref ** 2) * r_up_lb \
+            - (D_r_i / r_down_ref ** 2) * r_down_lb
+
+        # Deadline constraint: (D_l + D_r) / r_up <= tau_comm_budget
+        payload_bits = D_l_i + D_r_i
         _add_communication_delay_socp_constraint(
-            constraints, pos_diff, H, rate_safe, tau_comm_budget,
-            name_suffix=f"{j}_{i}_{t}"
+            constraints, pos_diff, H, r_up_lb, tau_comm_budget,
+            payload_bits=payload_bits,
+            name_suffix=f"{j}_{i}_{t}",
         )
 
-    # (4f) Safe distance constraint (SCA linearization, only 0 < t < T-1)
+    # (4f) Safe distance constraint — endpoint exemption (design assumption):
+    # All UAVs share a common depot (takeoff and landing point), so t=0 and t=T-1
+    # are intentionally exempt from safe-distance enforcement. Including endpoint
+    # slots would make the problem infeasible whenever UAVs share a depot.
+    # Effective domain: 0 < t < T-1 (SCA linearization, interim slots only).
     if traj_params.d_safe > 0:
         for j in uavs:
             for k in uavs:
                 if j >= k:
                     continue
-                for t in range(1, T - 1):  # interim only
+                for t in range(1, T - 1):  # interim slots only; endpoints exempt
                     # Linearization at reference point
                     # 2 · d_bar^T · (q_j - q_k) - ||d_bar||² + slack ≥ d_safe²
                     d_bar = np.array(q_ref[j][t], dtype=float) - np.array(q_ref[k][t], dtype=float)
@@ -619,9 +716,13 @@ def _build_sca_subproblem(
                         name_suffix=f"{j}_{k}_{t}",
                     )
 
-    # Objective: minimize propulsion energy + safe distance slack penalty
+    # Combined objective: alpha * comm_surrogate + lambda_w * propulsion + slack_penalty
     obj_slack = cp.sum(cp.hstack(objective_terms)) if objective_terms else 0.0
-    objective = cp.Minimize(obj_propulsion + obj_slack)
+    objective = cp.Minimize(
+        alpha * obj_comm_surrogate
+        + lambda_w * obj_propulsion
+        + obj_slack
+    )
 
     problem = cp.Problem(objective, constraints)
 
@@ -645,7 +746,7 @@ def _rate_lower_bound_expr(
         snr: SNR ratio β
 
     Returns:
-        CVXPY expression upper bound for 1/z (i.e., lower bound on rate)
+        CVXPY expression: affine lower bound on rate (bps)
     """
     beta = snr
 
@@ -722,19 +823,29 @@ def _evaluate_true_objective(
     q: Trajectory2D,
     traj_params: TrajectoryOptParams,
     params: PrecomputeParams,
-) -> float:
-    """Evaluate true propulsion energy using propulsion.total_flight_energy().
+    active_offloads: list[tuple[int, int, int]],
+    alpha: float = 1.0,
+    lambda_w: float = 1.0,
+) -> tuple[float, float, float]:
+    """Evaluate true L2b objective: alpha*comm_delay + lambda_w*prop_energy.
 
     Args:
         scenario: EdgeUavScenario
         q: Optimized trajectory dict[j][t] = (x, y)
         traj_params: TrajectoryOptParams
         params: PrecomputeParams
+        active_offloads: list of (j, i, t) active offload triples
+        alpha: Communication delay weight
+        lambda_w: Propulsion energy weight
 
     Returns:
-        Total propulsion energy (J) summed over all UAVs.
+        (total_obj, total_comm_delay, total_prop_energy)
+        where total_obj = alpha * total_comm_delay + lambda_w * total_prop_energy
     """
     delta = float(scenario.meta.get('delta', 0.5))
+    tasks = scenario.tasks
+
+    # Propulsion energy
     per_uav_energy = total_flight_energy(
         q,
         delta,
@@ -745,6 +856,31 @@ def _evaluate_true_objective(
         v_tip=traj_params.v_tip,
         include_terminal_hover=False,
     )
-    total_energy = sum(per_uav_energy.values())
+    E_prop = sum(per_uav_energy.values())
 
-    return total_energy
+    # Communication parameters
+    H       = float(scenario.meta.get('H',     100.0))
+    B_up    = float(scenario.meta.get('B_up',    2e7))
+    B_down  = float(scenario.meta.get('B_down',  2e7))
+    P_i     = float(scenario.meta.get('P_i',     0.5))
+    P_j     = float(scenario.meta.get('P_j',     1.0))
+    rho_0   = float(scenario.meta.get('rho_0',  1e-5))
+    N_0     = float(scenario.meta.get('N_0',   1e-10))
+    beta      = P_i * rho_0 / N_0
+    beta_down = P_j * rho_0 / N_0
+
+    # Communication delay (true, not surrogate)
+    total_comm = 0.0
+    for j, i, t in active_offloads:
+        w_i = np.array(tasks[i].pos, dtype=float)
+        q_jt = np.array(q[j][t], dtype=float)
+        z = float(np.sum((q_jt - w_i) ** 2)) + H ** 2
+        z = max(z, 1e-12)
+
+        r_up   = max(float((B_up   / np.log(2)) * np.log(1 + beta      / z)), 1e-12)
+        r_down = max(float((B_down / np.log(2)) * np.log(1 + beta_down / z)), 1e-12)
+
+        total_comm += float(tasks[i].D_l) / r_up + float(tasks[i].D_r) / r_down
+
+    total_obj = alpha * total_comm + lambda_w * E_prop
+    return float(total_obj), float(total_comm), float(E_prop)

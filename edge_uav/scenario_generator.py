@@ -307,6 +307,13 @@ class EdgeUavScenarioGenerator:
             "H": float(config.H),
             "depot_pos": (float(config.depot_x), float(config.depot_y)),
             "active_mode": config.active_mode,
+            # Communication parameters (for trajectory_opt constraint 4e)
+            "B_up":  float(config.B_up),
+            "B_down": float(config.B_down),
+            "P_i":   float(config.P_i),
+            "P_j":   float(config.P_j),   # UAV transmit power (W) — downlink SNR
+            "N_0":   float(config.N_0),
+            "rho_0": float(config.rho_0),
         }
 
     @staticmethod

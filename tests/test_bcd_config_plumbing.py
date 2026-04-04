@@ -135,6 +135,8 @@ def test_run_bcd_loop_passes_configured_sca_controls():
     traj_result = TrajectoryResult(
         q=initial_snapshot.q,
         objective_value=1.0,
+        total_comm_delay=0.0,
+        total_prop_energy=1.0,
         per_uav_energy={0: 1.0},
         sca_iterations=1,
         converged=True,

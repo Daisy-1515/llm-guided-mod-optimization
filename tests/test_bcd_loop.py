@@ -442,6 +442,8 @@ class TestBCDFinalDiagnostics:
             return TrajectoryResult(
                 q=q_new,
                 objective_value=next(trajectory_costs),
+                total_comm_delay=0.0,
+                total_prop_energy=1.0,
                 per_uav_energy={0: 1.0},
                 sca_iterations=1,
                 converged=False,

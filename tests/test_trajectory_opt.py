@@ -51,7 +51,9 @@ def base_scenario_1uav():
             'y_max': 100.0,
             'H': 10.0,
             'B_up': 2e7,
+            'B_down': 2e7,
             'P_i':   0.5,
+            'P_j':   1.0,
             'rho_0': 1e-5,
             'N_0':   1e-10,
             'depot_pos': (50.0, 50.0),
@@ -105,7 +107,9 @@ def base_scenario_2uav():
             'y_max': 100.0,
             'H': 10.0,
             'B_up': 2e7,
+            'B_down': 2e7,
             'P_i':   0.5,
+            'P_j':   1.0,
             'rho_0': 1e-5,
             'N_0':   1e-10,
             'depot_pos': (50.0, 50.0),
@@ -495,7 +499,7 @@ def test_default_scenario_with_safe_distance_non_endpoint(
 def test_trajectory_result_fields_complete(
     base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
 ):
-    """T12: TrajectoryResult contains all required fields."""
+    """T12: TrajectoryResult contains all required fields with correct semantics."""
     scenario = base_scenario_1uav
     q_init = linear_init_trajectory_1uav
 
@@ -506,6 +510,8 @@ def test_trajectory_result_fields_complete(
     # Check all fields exist and have correct types
     assert isinstance(result.q, dict)
     assert isinstance(result.objective_value, (int, float))
+    assert isinstance(result.total_comm_delay, (int, float))
+    assert isinstance(result.total_prop_energy, (int, float))
     assert isinstance(result.per_uav_energy, dict)
     assert isinstance(result.sca_iterations, int)
     assert isinstance(result.converged, bool)
@@ -515,9 +521,134 @@ def test_trajectory_result_fields_complete(
 
     # Check diagnostics keys
     assert "true_objective_history" in result.diagnostics
+    assert "total_comm_delay_history" in result.diagnostics
+    assert "total_prop_energy_history" in result.diagnostics
     assert "sca_times" in result.diagnostics
     assert "solver_status_history" in result.diagnostics
 
-    # Per-UAV energy sum should match total
-    sum_energy = sum(result.per_uav_energy.values())
-    assert np.isclose(sum_energy, result.objective_value, rtol=1e-6)
+    # No-offload case: comm_delay=0, so objective == lambda_w(=1) * prop_energy
+    assert np.isclose(result.objective_value, result.total_prop_energy, rtol=1e-6)
+    assert result.total_comm_delay == 0.0
+    assert np.isclose(
+        sum(result.per_uav_energy.values()), result.total_prop_energy, rtol=1e-6
+    )
+
+
+# ============================================================================
+# New Tests (T13-T16)
+# ============================================================================
+
+def test_combined_objective_decomposes_with_offload(
+    base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
+):
+    """T13: objective_value = alpha*total_comm_delay + lambda_w*total_prop_energy with offload."""
+    scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+    j, i, t_off = 0, 0, 1
+
+    f_fixed = {j: {i: {t_off: 5e8}}}
+    offloading_decisions = {}  # fallback mode
+
+    alpha = 2.0
+    lambda_w = 0.5
+    result = solve_trajectory_sca(
+        scenario, offloading_decisions, f_fixed, q_init, params, traj_params,
+        alpha=alpha, lambda_w=lambda_w,
+    )
+
+    # Decomposition check
+    expected_obj = alpha * result.total_comm_delay + lambda_w * result.total_prop_energy
+    assert np.isclose(result.objective_value, expected_obj, rtol=1e-6), (
+        f"objective_value={result.objective_value} != "
+        f"alpha*comm + lambda_w*prop = {expected_obj}"
+    )
+
+    # With offload, comm delay must be positive
+    assert result.total_comm_delay > 0, "Expected positive comm delay with active offload"
+
+
+def test_b_down_sensitivity(
+    base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
+):
+    """T14: Reducing B_down increases total_comm_delay (downlink rate impact)."""
+    import copy
+
+    base_scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+    j, i, t_off = 0, 0, 1
+    f_fixed = {j: {i: {t_off: 5e8}}}
+
+    # Baseline: B_down = 2e7
+    result_high = solve_trajectory_sca(
+        base_scenario, {}, f_fixed, q_init, params, traj_params,
+        max_sca_iter=3,
+    )
+
+    # Build scenario with lower B_down
+    low_meta = dict(base_scenario.meta)
+    low_meta['B_down'] = 1e6  # 10x smaller
+    scenario_low = EdgeUavScenario(
+        tasks=base_scenario.tasks,
+        uavs=base_scenario.uavs,
+        time_slots=base_scenario.time_slots,
+        seed=base_scenario.seed,
+        meta=low_meta,
+    )
+    result_low = solve_trajectory_sca(
+        scenario_low, {}, f_fixed, q_init, params, traj_params,
+        max_sca_iter=3,
+    )
+
+    assert result_low.total_comm_delay > result_high.total_comm_delay, (
+        f"Lower B_down should yield higher comm delay: "
+        f"low={result_low.total_comm_delay:.4f}, high={result_high.total_comm_delay:.4f}"
+    )
+
+
+def test_offloading_decisions_f_fixed_consistency_error(
+    base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
+):
+    """T15: offloading_decisions/f_fixed inconsistency raises ValueError."""
+    scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+
+    # offloading_decisions says no offload for any UAV at any slot
+    offloading_decisions = {
+        0: {"local": [0], "offload": {}},
+        1: {"local": [0], "offload": {}},
+        2: {"local": [0], "offload": {}},
+    }
+    # But f_fixed has a positive entry: residual allocation
+    f_fixed = {0: {0: {1: 5e8}}}
+
+    with pytest.raises(ValueError, match="residual"):
+        solve_trajectory_sca(
+            scenario, offloading_decisions, f_fixed, q_init, params, traj_params
+        )
+
+
+def test_endpoint_reachability_constraint_4e(
+    base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
+):
+    """T16: After optimization, endpoint reachability constraint holds for all t."""
+    scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+
+    result = solve_trajectory_sca(
+        scenario, {}, {}, q_init, params, traj_params,
+        max_sca_iter=5,
+    )
+
+    delta = float(scenario.meta.get('delta', 0.5))
+    T = len(scenario.time_slots)
+
+    for j in scenario.uavs:
+        pos_final = np.array(scenario.uavs[j].pos_final, dtype=float)
+        for t in range(T - 1):
+            remaining = T - 1 - t
+            max_dist = traj_params.v_max * remaining * delta
+            q_jt = np.array(result.q[j][t], dtype=float)
+            dist_sq = np.sum((q_jt - pos_final) ** 2)
+            assert dist_sq <= max_dist ** 2 + 1e-3, (
+                f"UAV {j} at t={t}: dist²={dist_sq:.4f} > max_dist²={max_dist**2:.4f}"
+            )

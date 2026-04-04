@@ -569,6 +569,8 @@ def run_bcd_loop(
                 max_sca_iter=int(getattr(config, "max_sca_iter", 100)),
                 eps_sca=float(getattr(config, "eps_sca", 1e-3)),
                 safe_slack_penalty=float(getattr(config, "safe_slack_penalty", 1e3)),
+                alpha=float(getattr(config, "alpha", 1.0)),
+                lambda_w=float(getattr(config, "lambda_w", 1.0)),
             )
             q_new, cost_traj = check_trajectory_monotonicity(
                 traj_result, scenario, config
