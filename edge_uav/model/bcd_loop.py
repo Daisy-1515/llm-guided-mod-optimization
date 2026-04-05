@@ -22,6 +22,7 @@ from config.config import configPara
 from edge_uav.data import EdgeUavScenario
 from edge_uav.model.offloading import OffloadingModel
 from edge_uav.model.precompute import (
+    InitPolicy,
     Level2Snapshot,
     PrecomputeParams,
     PrecomputeResult,
@@ -424,6 +425,7 @@ def run_bcd_loop(
     eps_bcd: float = 1e-3,
     cost_rollback_delta: float = 0.05,
     max_rollbacks: int = 2,
+    init_policy: InitPolicy = "greedy",
 ) -> BCDResult:
     """Run Block Coordinate Descent (BCD) outer loop for integrated optimization.
 
@@ -463,7 +465,7 @@ def run_bcd_loop(
     logger.info("BCD loop: Initializing warm start")
     if initial_snapshot is None:
         initial_snapshot = make_initial_level2_snapshot(
-            scenario, policy="paper_default"
+            scenario, policy=init_policy
         )
     initial_snapshot.validate(scenario)
     logger.debug(f"Initial snapshot source: {initial_snapshot.source}")
