@@ -129,7 +129,10 @@ uv run pytest tests -v
 
 1. ~~修复 3 个 pre-existing 测试失败~~ — **已完成**（2026-04-05）
 2. ~~SCA unbounded / 求解器精度问题~~ — **已完成**（2026-04-05）：Gurobi fallback + F_max 调整
-3. 调查多 UAV 轨迹退化问题（3 架 UAV 轨迹完全相同，SCA 无分化）— 当前 alpha=35 下通信牵引力仍不足
+3. **继续验证 F_max=2e8 + B=2e7 "甜区"参数下 BCD 多轮迭代效果**
+   - tau=100s 实验证实 greedy init + SCA 可产生轨迹分化
+   - F_max=2e8 实验 L1 cost 16.15→11.52，BCD 在优化但需验证卸载决策详情
+   - 检查 offloading_outputs 是否正确保存到 JSON
 4. 运行完整规模 HS 实验，验证 LLM 引导优化效果
 5. 分析诊断指标趋势，评估目标函数多样性
 
