@@ -97,7 +97,7 @@ def solve_trajectory_sca(
     max_sca_iter: int = 100,
     eps_sca: float = 1e-3,
     safe_slack_penalty: float = 1e6,
-    solver_fallback: tuple[str, ...] = ("CLARABEL", "ECOS", "SCS"),
+    solver_fallback: tuple[str, ...] = ("GUROBI", "CLARABEL", "ECOS", "SCS"),
     alpha: float = 1.0,
     lambda_w: float = 1.0,
     N_act: int = 1,

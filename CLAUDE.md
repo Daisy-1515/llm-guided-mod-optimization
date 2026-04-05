@@ -121,14 +121,17 @@ uv run pytest tests -v
 - greedy init Bug 修复（`c3618d6`）
 - 修复 3 个 pre-existing 测试失败（`d19ec0a`）
 - SCA 轨迹分化根因诊断
-- 154 tests passed（1 skipped）
+- SCA 求解器修复：Gurobi 加入 solver fallback 首位，解决开源求解器大规模 SOCP 精度不足
+- 参数调优：F_max 2.5e8→1.5e8（消除双重死锁），B_up/B_down 4e7→5e6（提升通信时延占比）
+- 150 passed, 1 skipped, 2 skipped
 
 ## 下次开始建议
 
-1. ~~修复 3 个 pre-existing 测试失败~~ — **已完成**（2026-04-05）：bcd_metadata 键名已修复、LLM 依赖测试已删除、N_max 测试实际已通过；当前 154/154 tests pass
-2. 调查多 UAV 轨迹退化问题（3 架 UAV 轨迹完全相同，SCA 无分化）
-3. 运行完整规模 HS 实验，验证 LLM 引导优化效果
-4. 分析诊断指标趋势，评估目标函数多样性
+1. ~~修复 3 个 pre-existing 测试失败~~ — **已完成**（2026-04-05）
+2. ~~SCA unbounded / 求解器精度问题~~ — **已完成**（2026-04-05）：Gurobi fallback + F_max 调整
+3. 调查多 UAV 轨迹退化问题（3 架 UAV 轨迹完全相同，SCA 无分化）— 当前 alpha=35 下通信牵引力仍不足
+4. 运行完整规模 HS 实验，验证 LLM 引导优化效果
+5. 分析诊断指标趋势，评估目标函数多样性
 
 ---
 

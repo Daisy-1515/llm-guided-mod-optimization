@@ -599,9 +599,10 @@ def run_bcd_loop(
             )
             solution_details["final_sca_iterations"] = traj_result.sca_iterations
             logger.info(
-                f"Level 2b trajectory optimized "
-                f"(cost={cost_traj:.4f}, sca_iter={traj_result.sca_iterations}, "
-                f"converged={traj_result.converged})"
+                f"  [BCD k={k}] L2b: cost_traj={cost_traj:.6f}, "
+                f"comm_delay={traj_result.total_comm_delay:.6f}, "
+                f"prop_energy={traj_result.total_prop_energy:.6f}, "
+                f"sca_iter={traj_result.sca_iterations}, converged={traj_result.converged}"
             )
         except Exception as e:
             logger.error(f"Level 2b trajectory optimization failed at iteration {k}: {e}")
@@ -643,6 +644,10 @@ def run_bcd_loop(
         # = ra_result.objective_value + cost_traj
         # Corresponds to L2-obj terms: (1+3) + (2+4)
         cost_new = ra_result.objective_value + cost_traj
+        logger.info(
+            f"  [BCD k={k}] ra_obj={ra_result.objective_value:.6f}, "
+            f"cost_traj={cost_traj:.6f}, total={cost_new:.6f}"
+        )
 
         # Cost rollback mechanism (only if dynamic_obj_func is provided)
         if dynamic_obj_func is not None:
