@@ -3,6 +3,7 @@ Test Phase⑥ Step4 BCD Loop Integration - Phase 5: Hot-Start Snapshot Tracking
 
 Tests for hot-start snapshot passing across generations in hsPopulation.
 """
+import os
 import pytest
 from copy import deepcopy
 from config.config import configPara
@@ -201,6 +202,10 @@ class TestGenerateNewHarmonyWithSnapshot:
         assert parent_snapshot is None or isinstance(parent_snapshot, (dict, Level2Snapshot)), \
             "parent_snapshot should be None, dict, or Level2Snapshot"
 
+    @pytest.mark.skipif(
+        not os.environ.get("OPENAI_API_KEY"),
+        reason="Requires LLM API configuration"
+    )
     def test_condition_t_equals_0_is_integer_comparison(self, hs_bundle_with_bcd):
         """验证修复: 条件应是 t == 0 (整数比较) 而非 't' == 0 (字符串比较)"""
         config, scenario = hs_bundle_with_bcd

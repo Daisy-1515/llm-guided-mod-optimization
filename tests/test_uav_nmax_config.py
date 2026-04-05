@@ -27,7 +27,7 @@ def test_scenario_generator_injects_default_n_max():
     scenario = EdgeUavScenarioGenerator().getScenarioInfo(cfg)
 
     assert scenario.uavs
-    assert all(uav.N_max == 1 for uav in scenario.uavs.values())
+    assert all(uav.N_max == cfg.N_max for uav in scenario.uavs.values())
 
 
 def test_offloading_respects_per_slot_n_max():
