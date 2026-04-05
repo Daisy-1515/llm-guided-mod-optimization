@@ -7,16 +7,17 @@ Level-1 目标函数规范源（Canonical Source）
 修复历程：
   - 2026-03-30：新建本文件，解决三处目标函数分散问题
   - 2026-03-31：移除 drop 失败机制，回退到纯 cost1+cost2 公式
+  - 2026-04-05：添加聚合归一化因子 (1/N_act)
 """
 
 # ===== 第 1 部分：数学规范和完整推导 =====
 
 CANONICAL_OBJECTIVE_V1 = r"""
-标准 Level-1 目标函数（版本 1.1，2026-03-31）
+标准 Level-1 目标函数（版本 1.2，2026-04-05）
 
-定义：
-    minimize: Σ_{i∈I} Σ_{t∈T} [ α·D̂_{i,⊙}(x) / τ_i
-                                 + γ_w·Ê_{comp}(x,f_edge) / E_{max,edge} ]
+定义（聚合归一化版本）：
+    minimize: (1/N_act) × Σ_{i∈I} Σ_{t∈T} [ α·D̂_{i,⊙}(x) / τ_i
+                                           + γ_w·Ê_{comp}(x,f_edge) / E_{max,edge} ]
 
 其中：
     - x_{i,i}^t, x_{i,j}^t: Layer-1 分配决策变量
@@ -25,6 +26,8 @@ CANONICAL_OBJECTIVE_V1 = r"""
 
     - α = config.alpha（时延权重，默认 1.0）
     - γ_w = config.gamma_w（能耗权重，默认 1.0）
+
+    - N_act = Σ_t Σ_i ζ_i^t（全时域 active task-slot 总数）
 
 约束：
     同时参见 offloading.py 的 L1-C1 ~ L1-C3
@@ -40,6 +43,13 @@ DEFAULT_OBJECTIVE_CODE = """
 # 标准 Level-1 目标函数（Harmony Search 兼容格式）
 # 在 hsIndividualEdgeUav.py 中使用此代码作为默认目标
 # 对应文档: edge_uav/model/objectives.py / 第 2 部分
+# 版本 1.2, 2026-04-05: 添加聚合归一化因子 (1/N_act)
+
+# 聚合归一化因子 N_act 必须在外部定义并传入
+# 如果未定义，默认为 1（向后兼容）
+if 'N_act' not in dir() or N_act is None or N_act <= 0:
+    N_act = 1
+inv_N_act = 1.0 / N_act
 
 cost = 0.0
 
@@ -51,19 +61,19 @@ for i in range(n_tasks):
 
         # 本地执行时延
         if (i, t) in x_local:
-            cost += alpha * D_local[i][t] / tau[i] * x_local[(i, t)]
+            cost += inv_N_act * alpha * D_local[i][t] / tau[i] * x_local[(i, t)]
 
         # 卸载执行时延
         for j in range(n_uavs):
             if (i, j, t) in x_offload:
-                cost += alpha * D_offload[i][j][t] / tau[i] * x_offload[(i, j, t)]
+                cost += inv_N_act * alpha * D_offload[i][j][t] / tau[i] * x_offload[(i, j, t)]
 
 # 能耗项
 for j in range(n_uavs):
     for i in range(n_tasks):
         for t in range(n_slots):
             if (i, j, t) in x_offload:
-                cost += gamma_w * E_comp[j][i][t] / E_max[j] * x_offload[(i, j, t)]
+                cost += inv_N_act * gamma_w * E_comp[j][i][t] / E_max[j] * x_offload[(i, j, t)]
 
 objective_value = cost
 """
@@ -80,9 +90,10 @@ def compute_objective_value(
     E_max_list: dict,   # [j]
     alpha=1.0,
     gamma_w=1.0,
+    N_act: int = 1,
 ) -> float:
     """
-    纯 Python 计算目标函数值。
+    纯 Python 计算目标函数值（聚合归一化版本）。
     用于验证、诊断或离线评估。
 
     参数
@@ -103,26 +114,29 @@ def compute_objective_value(
         时延权重
     gamma_w : float
         能耗权重
+    N_act : int
+        聚合归一化因子（active task-slot 总数），默认 1
 
     返回
     -------
     float
-        目标函数值
+        目标函数值（已归一化）
     """
+    inv_N_act = 1.0 / N_act if N_act > 0 else 1.0
     cost = 0.0
 
     for (i, t), (mode, j_opt) in assignments.items():
         if mode == "local":
             delay = D_local[i][t]
             tau_i = float(tau_list[i])
-            cost += alpha * delay / tau_i
+            cost += inv_N_act * alpha * delay / tau_i
         elif mode == "offload":
             delay = D_offload[i][j_opt][t]
             energy = E_comp[j_opt][i][t]
             tau_i = float(tau_list[i])
             E_max_j = float(E_max_list[j_opt])
-            cost += alpha * delay / tau_i
-            cost += gamma_w * energy / E_max_j
+            cost += inv_N_act * alpha * delay / tau_i
+            cost += inv_N_act * gamma_w * energy / E_max_j
 
     return cost
 

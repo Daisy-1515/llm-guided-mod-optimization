@@ -100,6 +100,8 @@ def solve_trajectory_sca(
     solver_fallback: tuple[str, ...] = ("CLARABEL", "ECOS", "SCS"),
     alpha: float = 1.0,
     lambda_w: float = 1.0,
+    N_act: int = 1,
+    N_fly: int = 1,
 ) -> TrajectoryResult:
     """Solve the trajectory SCA subproblem with safety-aware solution screening."""
     _validate_input_basic(scenario, q_init, traj_params, params)
@@ -169,6 +171,8 @@ def solve_trajectory_sca(
                 safe_slack_penalty,
                 alpha=alpha,
                 lambda_w=lambda_w,
+                N_act=N_act,
+                N_fly=N_fly,
             )
         except Exception as e:
             raise ValueError(f"SCA iteration {sca_k} failed to build subproblem: {e}")
@@ -206,6 +210,8 @@ def solve_trajectory_sca(
                 active_offloads,
                 alpha=alpha,
                 lambda_w=lambda_w,
+                N_act=N_act,
+                N_fly=N_fly,
             )
             max_slack = (
                 float(np.max([sv.value for sv in slack_safe.values()]))
@@ -690,8 +696,14 @@ def _build_sca_subproblem(
     safe_slack_penalty: float,
     alpha: float = 1.0,
     lambda_w: float = 1.0,
+    N_act: int = 1,
+    N_fly: int = 1,
 ) -> tuple[cp.Problem, dict, dict, cp.Expression]:
     """围绕参照起点位 q_ref 来进行打桩和架置本趟回转的用以施行的 CVXPY SOCP 等效替代子命题方程组框架模型。
+
+    聚合归一化版本（系统成本公式 (20)）:
+        - 通信项: (1/N_act) × α × Σ(D/r)/τ
+        - 推进项: (1/N_fly) × λ_w × Σ E_fly / E_max
 
     返回:
         一套由 (problem, q_var, slack_safe_dict, obj_expr) 四分组合组成的产系结果：
@@ -706,6 +718,10 @@ def _build_sca_subproblem(
     delta = float(scenario.meta.get('delta', 0.5))
     uavs = scenario.uavs
     tasks = scenario.tasks
+
+    # 聚合归一化因子
+    inv_N_act = 1.0 / N_act if N_act > 0 else 1.0
+    inv_N_fly = 1.0 / N_fly if N_fly > 0 else 1.0
 
     # 决策变元组
     q_var = {j: {t: cp.Variable(2) for t in range(T)} for j in uavs}
@@ -767,7 +783,9 @@ def _build_sca_subproblem(
             constraints.append(cp.sum_squares(diff) <= max_dist ** 2)
 
     # 发动机运转用功打耗推进飞移动气耗推向目引数项算量 (透过依托用伴生引产出列的属列阵元素 speed_sq 来转介构建代引结立生成这项目)
+    # 聚合归一化版本: (1/N_fly) × Σ_j (E_fly_j / E_max_j)
     for j in uavs:
+        E_max_j = uavs[j].E_max  # 每架 UAV 的能量预算
         for t in range(T - 1):
             # 每每处于这时缝间区内该阶段产生的自身出力强弱功率算公式是: P(v²) = η₁(1 + 3v²/v_tip²) + φ_ind(v²) + η₄v³
             # 应用借着使用那向截弓直去弓拉打弦挂靠的刀手割手段于取用 [0, v_max²] 所覆包其定区间里建构生提出并盖覆搭罩上的包面防漏凸面大包盖拱面穹盖遮封层用来当作为这指标限向上限界定高界值
@@ -792,9 +810,13 @@ def _build_sca_subproblem(
             # 构成的这三连封防漏限越线大封护最高压限天顶极限高高拦截盖面
             power_ub = term1 + term2_ub + term3_ub
 
-            # 置配入于当下此时期片段的本内局内阶段里将统括收揽去用支去耗用的引散流放能量消解花量结账: 单时刻至顶耗项数值乘附上跨步区跨幅时长标距标尺 δ
-            energy_contrib = power_ub * delta
+            # 置配入于当下此时期片段的本内局内阶段里将统括收揽去用支去耗用的引散流放能量消解花量结账:
+            # 单时刻至顶耗项数值乘附上跨步区跨幅时长标距标尺 δ，然后除以 E_max_j 进行归一化
+            energy_contrib = power_ub * delta / E_max_j
             obj_propulsion += energy_contrib
+
+    # 应用聚合归一化因子 inv_N_fly
+    obj_propulsion = inv_N_fly * obj_propulsion
 
     # 参数定指常额号数值数据一并全从场景表抽取调唤调引入位收列接发供供入项支待命使用
     H       = float(scenario.meta.get('H',     100.0))
@@ -837,11 +859,12 @@ def _build_sca_subproblem(
 
         # Communication delay surrogate objective (DCP: negative constant × concave = convex)
         # Proxy for minimizing D_l/r_up + D_r/r_down via SCA
+        # 聚合归一化版本: (1/N_act) × (D_l/r_up + D_r/r_down)
         D_l_i = float(tasks[i].D_l)
         D_r_i = float(tasks[i].D_r)
         obj_comm_surrogate = obj_comm_surrogate \
-            - (D_l_i / r_up_ref ** 2) * r_up_lb \
-            - (D_r_i / r_down_ref ** 2) * r_down_lb
+            - inv_N_act * (D_l_i / r_up_ref ** 2) * r_up_lb \
+            - inv_N_act * (D_r_i / r_down_ref ** 2) * r_down_lb
 
         # Deadline constraint: (D_l + D_r) / r_up <= tau_comm_budget
         payload_bits = D_l_i + D_r_i
@@ -984,8 +1007,14 @@ def _evaluate_true_objective(
     active_offloads: list[tuple[int, int, int]],
     alpha: float = 1.0,
     lambda_w: float = 1.0,
+    N_act: int = 1,
+    N_fly: int = 1,
 ) -> tuple[float, float, float]:
-    """计算评估真实客观的 L2b 目标: alpha*comm_delay + lambda_w*prop_energy。
+    """计算评估真实客观的 L2b 目标（聚合归一化版本）。
+
+    目标函数（系统成本公式 (20)）:
+        total_obj = (1/N_act) × α × total_comm_delay
+                  + (1/N_fly) × λ_w × Σ_j (E_fly_j / E_max_j)
 
     参数:
         scenario: EdgeUavScenario 对象
@@ -995,15 +1024,23 @@ def _evaluate_true_objective(
         active_offloads: 活跃任务元组集
         alpha: 通讯目标权重
         lambda_w: 耗能目标权重
+        N_act: 聚合归一化因子（active task-slot 总数）
+        N_fly: 聚合归一化因子（UAV 移动段总数）
 
     返回:
-        (total_obj, total_comm_delay, total_prop_energy)
-        where total_obj = alpha * total_comm_delay + lambda_w * total_prop_energy
+        (total_obj, total_comm_delay, total_prop_energy_normalized)
+        where total_obj = (1/N_act) × α × total_comm_delay
+                         + (1/N_fly) × λ_w × total_prop_energy_normalized
     """
+    # 聚合归一化因子
+    inv_N_act = 1.0 / N_act if N_act > 0 else 1.0
+    inv_N_fly = 1.0 / N_fly if N_fly > 0 else 1.0
+
     delta = float(scenario.meta.get('delta', 0.5))
     tasks = scenario.tasks
+    uavs = scenario.uavs
 
-    # Propulsion energy
+    # Propulsion energy with E_max normalization per UAV
     per_uav_energy = total_flight_energy(
         q,
         delta,
@@ -1014,7 +1051,11 @@ def _evaluate_true_objective(
         v_tip=traj_params.v_tip,
         include_terminal_hover=False,
     )
-    E_prop = sum(per_uav_energy.values())
+    # E_max 归一化：每架 UAV 的推进能量除以其 E_max
+    E_prop_normalized = sum(
+        per_uav_energy[j] / uavs[j].E_max
+        for j in uavs if j in per_uav_energy
+    )
 
     # Communication parameters
     H       = float(scenario.meta.get('H',     100.0))
@@ -1040,5 +1081,6 @@ def _evaluate_true_objective(
 
         total_comm += float(tasks[i].D_l) / r_up + float(tasks[i].D_r) / r_down
 
-    total_obj = alpha * total_comm + lambda_w * E_prop
-    return float(total_obj), float(total_comm), float(E_prop)
+    # 聚合归一化目标函数
+    total_obj = inv_N_act * alpha * total_comm + inv_N_fly * lambda_w * E_prop_normalized
+    return float(total_obj), float(total_comm), float(E_prop_normalized)

@@ -522,6 +522,7 @@ def run_bcd_loop(
                 E_hat_comp=precompute_result.E_hat_comp,
                 alpha=float(getattr(config, "alpha", 1.0)),
                 gamma_w=float(getattr(config, "gamma_w", 1.0)),
+                N_act=precompute_result.N_act,
                 dynamic_obj_func=dynamic_obj_func,
             )
             offloading_model.solveProblem()
@@ -552,6 +553,7 @@ def run_bcd_loop(
                 params,
                 alpha=float(getattr(config, "alpha", 1.0)),
                 gamma_w=float(getattr(config, "gamma_w", 1.0)),
+                N_act=precompute_result.N_act,
             )
             if not validate_resource_allocation_feasibility(ra_result, scenario):
                 logger.warning("Resource allocation may be infeasible, continuing...")
@@ -578,6 +580,8 @@ def run_bcd_loop(
                 safe_slack_penalty=float(getattr(config, "safe_slack_penalty", 1e6)),
                 alpha=float(getattr(config, "alpha", 1.0)),
                 lambda_w=float(getattr(config, "lambda_w", 1.0)),
+                N_act=precompute_result.N_act,
+                N_fly=precompute_result.N_fly,
             )
             q_new, cost_traj = check_trajectory_monotonicity(
                 traj_result, scenario, config

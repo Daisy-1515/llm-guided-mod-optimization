@@ -25,6 +25,13 @@ def params():
         N_0=1e-11,
         rho_0=1.0,
         gamma_j=1e-28,
+        # 推进参数（用于飞行能量计算）
+        eta_1=100.0,
+        eta_2=50.0,
+        eta_3=0.1,
+        eta_4=0.5,
+        v_tip=100.0,
+        delta=0.5,
         eps_freq=1e-12,
     )
 

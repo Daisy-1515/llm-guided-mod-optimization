@@ -16,6 +16,7 @@ from typing import Any, Literal, Mapping
 
 from config.config import configPara
 from edge_uav.data import ComputeTask, UAV, EdgeUavScenario
+from edge_uav.model.propulsion import total_flight_energy
 
 _LN2 = math.log(2.0)
 
@@ -53,6 +54,14 @@ class PrecomputeParams:
     rho_0: float      # 1m 参考信道增益
     gamma_j: float    # 边缘节点芯片能耗系数
 
+    # ---- 推进参数（用于飞行能量计算） ----
+    eta_1: float      # 叶片剖面功率 (W)
+    eta_2: float      # 诱导功率 (W)
+    eta_3: float      # 机身阻力比
+    eta_4: float      # 空气密度系数
+    v_tip: float      # 桨尖速度 (m/s)
+    delta: float      # 时隙长度 (s)
+
     # ---- 数值保护 ----
     eps_dist_sq: float = 1e-12   # 距离平方下限，防 g → ∞
     eps_rate: float = 1e-12      # 速率下限，防除零
@@ -71,7 +80,7 @@ class PrecomputeParams:
         tau_tol: float = 1e-9,
         big_m_delay: float = 1e6,
     ) -> PrecomputeParams:
-        """从 configPara 提取 8 个物理参数，合并数值保护默认值。
+        """从 configPara 提取物理参数和推进参数，合并数值保护默认值。
 
         Raises:
             ValueError: 物理参数非正或非有限值时。
@@ -85,6 +94,14 @@ class PrecomputeParams:
             "N_0": float(config.N_0),
             "rho_0": float(config.rho_0),
             "gamma_j": float(config.gamma_j),
+            # 推进参数
+            "eta_1": float(config.eta_1),
+            "eta_2": float(config.eta_2),
+            "eta_3": float(config.eta_3),
+            "eta_4": float(config.eta_4),
+            "v_tip": float(config.v_tip),
+            "delta": float(config.delta),
+            # 数值保护
             "eps_dist_sq": float(eps_dist_sq),
             "eps_rate": float(eps_rate),
             "eps_freq": float(eps_freq),
@@ -110,6 +127,12 @@ class PrecomputeParams:
             N_0=raw["N_0"],
             rho_0=raw["rho_0"],
             gamma_j=raw["gamma_j"],
+            eta_1=raw["eta_1"],
+            eta_2=raw["eta_2"],
+            eta_3=raw["eta_3"],
+            eta_4=raw["eta_4"],
+            v_tip=raw["v_tip"],
+            delta=raw["delta"],
             eps_dist_sq=raw["eps_dist_sq"],
             eps_rate=raw["eps_rate"],
             eps_freq=raw["eps_freq"],
@@ -239,11 +262,18 @@ class PrecomputeResult:
             D_hat_offload=result.D_hat_offload,
             E_hat_comp=result.E_hat_comp,
         )
+
+    聚合归一化因子（用于系统成本公式 (20)）:
+        N_act = Σ_t Σ_i ζ_i^t  (全时域 active task-slot 总数)
+        N_fly = |U| × (T-1)    (全时域 UAV 移动段总数)
     """
 
     D_hat_local: Scalar2D       # [i][t] — 本地执行时延 (s)
     D_hat_offload: Scalar3D     # [i][j][t] — 远程卸载总时延 (s)
     E_hat_comp: Scalar3D        # [j][i][t] — 边缘计算能耗 (J)
+    E_prop: dict[int, float]    # [j] — UAV j 的总推进能量 (J)
+    N_act: int                  # 聚合归一化因子：active task-slot 总数
+    N_fly: int                  # 聚合归一化因子：UAV 移动段总数 = |U| × (T-1)
     diagnostics: dict[str, Any]  # 诊断信息（见 precompute_analysis.md §7.6）
 
 
@@ -470,10 +500,32 @@ def precompute_offloading_inputs(
         eps_freq=params.eps_freq,
     )
 
+    # ---- 计算 N_act 和 N_fly 聚合归一化因子 ----
+    # N_act = Σ_t Σ_i ζ_i^t (全时域 active task-slot 总数)
+    # 注意: active_task_slots 已在 Step 1 中累加，直接使用
+    N_act = active_task_slots
+
+    # N_fly = |U| × (T-1) (全时域 UAV 移动段总数)
+    N_fly = len(uavs) * (len(time_slots) - 1)
+
+    # ---- 计算 E_prop: UAV 推进能量 ----
+    E_prop = total_flight_energy(
+        snapshot.q,
+        params.delta,
+        eta_1=params.eta_1,
+        eta_2=params.eta_2,
+        eta_3=params.eta_3,
+        eta_4=params.eta_4,
+        v_tip=params.v_tip,
+    )
+
     return PrecomputeResult(
         D_hat_local=D_hat_local,
         D_hat_offload=D_hat_offload,
         E_hat_comp=E_hat_comp,
+        E_prop=E_prop,
+        N_act=N_act,
+        N_fly=N_fly,
         diagnostics=diagnostics,
     )
 

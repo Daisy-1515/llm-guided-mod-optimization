@@ -65,6 +65,13 @@ def _make_params() -> PrecomputeParams:
         N_0=1e-10,
         rho_0=1e-5,
         gamma_j=1e-28,
+        # 推进参数（用于飞行能量计算）
+        eta_1=10.0,
+        eta_2=5.0,
+        eta_3=1e4,
+        eta_4=0.1,
+        v_tip=120.0,
+        delta=0.5,
         eps_dist_sq=1e-12,
         eps_rate=1e-12,
         eps_freq=1e-12,
@@ -121,6 +128,9 @@ def test_run_bcd_loop_passes_configured_sca_controls():
         D_hat_local={0: {0: 0.1, 1: 0.1, 2: 0.1}},
         D_hat_offload={0: {0: {0: 0.1, 1: 0.1, 2: 0.1}}},
         E_hat_comp={0: {0: {0: 0.1, 1: 0.1, 2: 0.1}}},
+        E_prop={0: 0.0},
+        N_act=1,  # 聚合归一化因子
+        N_fly=1,  # 聚合归一化因子
         diagnostics={},
     )
     ra_result = SimpleNamespace(

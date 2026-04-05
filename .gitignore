@@ -45,6 +45,7 @@ discussion/
 *.tmp
 *.temp
 *.ilp
+temp_docx/
 
 # ---- Local env / secrets ----
 .env

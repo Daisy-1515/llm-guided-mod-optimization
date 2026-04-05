@@ -43,6 +43,7 @@ class OffloadingModel:
     def __init__(self, tasks, uavs, time_list,
                  D_hat_local, D_hat_offload, E_hat_comp,
                  alpha=1.0, gamma_w=1.0,
+                 N_act: int = 1,
                  dynamic_obj_func=None):
         """
         参数
@@ -63,6 +64,8 @@ class OffloadingModel:
             归一化时延项权重。
         gamma_w : float
             归一化能耗项权重。
+        N_act : int
+            聚合归一化因子（active task-slot 总数），默认 1。
         dynamic_obj_func : str or None
             LLM 生成的目标函数代码（Python 字符串）。
         """
@@ -81,6 +84,9 @@ class OffloadingModel:
         # 权重系数
         self.alpha = alpha
         self.gamma_w = gamma_w
+
+        # 聚合归一化因子
+        self.N_act = N_act
 
         # 求解器参数
         self.M = 100000
@@ -328,18 +334,24 @@ class OffloadingModel:
     def default_dynamic_obj_func(self):
         """标准 L1 目标函数（公式文档中的 L1-obj）。
 
+        聚合归一化版本（系统成本公式 (20)）:
+            cost = (1/N_act) × [ α·Σ(D̂/τ) + γ_w·Σ(Ê_comp/E_max) ]
+
         cost1：归一化时延（本地执行 + 卸载执行）
         cost2：归一化边缘计算能耗
         """
+        # 聚合归一化因子
+        inv_N_act = 1.0 / self.N_act if self.N_act > 0 else 1.0
+
         # 成本项1：加权归一化时延
         cost1 = gb.quicksum(
-            self.alpha * self.D_hat_local[i][t] / self.task[i].tau
+            inv_N_act * self.alpha * self.D_hat_local[i][t] / self.task[i].tau
             * self.x_local[i, t]
             for i in self.taskList
             for t in self.timeList
             if self.task[i].active[t] and (i, t) in self.x_local
         ) + gb.quicksum(
-            self.alpha * self.D_hat_offload[i][j][t] / self.task[i].tau
+            inv_N_act * self.alpha * self.D_hat_offload[i][j][t] / self.task[i].tau
             * self.x_offload[i, j, t]
             for i in self.taskList
             for j in self.uavList
@@ -349,7 +361,7 @@ class OffloadingModel:
 
         # 成本项2：归一化边缘计算能耗
         cost2 = gb.quicksum(
-            self.gamma_w * self.E_hat_comp[j][i][t] / self.uav[j].E_max
+            inv_N_act * self.gamma_w * self.E_hat_comp[j][i][t] / self.uav[j].E_max
             * self.x_offload[i, j, t]
             for i in self.taskList
             for j in self.uavList

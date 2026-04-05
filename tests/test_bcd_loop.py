@@ -412,6 +412,9 @@ class TestBCDFinalDiagnostics:
                 D_hat_local={},
                 D_hat_offload={},
                 E_hat_comp={},
+                E_prop={0: 0.0},
+                N_act=1,  # 聚合归一化因子
+                N_fly=1,  # 聚合归一化因子
                 diagnostics={"snapshot_source": snapshot.source},
             )
 

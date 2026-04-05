@@ -58,6 +58,7 @@ def solve_resource_allocation(
     *,
     alpha: float,
     gamma_w: float,
+    N_act: int = 1,
 ) -> ResourceAllocResult:
     """求解 Block C：针对给定的卸载决策进行最优频率分配。
 
@@ -68,6 +69,7 @@ def solve_resource_allocation(
         params: 物理参数 (此处使用 gamma_j, eps_freq)。
         alpha: 延迟权重 (> 0, 仅限关键字参数)。
         gamma_w: 能量缩放因子 (> 0, 仅限关键字参数)。
+        N_act: 聚合归一化因子（active task-slot 总数），默认 1。
 
     返回:
         带有 f_local, f_edge, objective, diagnostics 的 ResourceAllocResult 对象。
@@ -117,7 +119,7 @@ def solve_resource_allocation(
             diag["max_bisect_iters"] = max(diag["max_bisect_iters"], n_bisect)
 
     obj = _compute_objective(f_edge, offload_sets, scenario, params,
-                             alpha=alpha, gamma_w=gamma_w)
+                             alpha=alpha, gamma_w=gamma_w, N_act=N_act)
 
     # Eq. 3-25: 计算每架无人机的总计算能量，用于验证 BCD 可行性
     comp_energy = _compute_comp_energy(f_edge, offload_sets, scenario, params)
@@ -257,11 +259,13 @@ def _compute_objective(
     *,
     alpha: float,
     gamma_w: float,
+    N_act: int = 1,
 ) -> float:
-    """L2a 目标函数: Σ [ α·F/(f·τ) + γ_w·γ_j·f²·F/E_max ]。
+    """L2a 目标函数: (1/N_act) × Σ [ α·F/(f·τ) + γ_w·γ_j·f²·F/E_max ]。
 
     仅包含与频率相关的项；通信延迟作为外部参数给定。
     """
+    inv_N_act = 1.0 / N_act if N_act > 0 else 1.0
     obj = 0.0
     for j, slot_map in offload_sets.items():
         uav = scenario.uavs[j]
@@ -272,9 +276,9 @@ def _compute_objective(
                 if f is None or f <= 0.0:
                     continue
                 task = scenario.tasks[i]
-                # Eq. 3-20: 延迟项 + 能量项
-                obj += alpha * task.F / (f * task.tau)
-                obj += gamma_w * params.gamma_j * f * f * task.F / uav.E_max
+                # Eq. 3-20: 延迟项 + 能量项（带聚合归一化）
+                obj += inv_N_act * alpha * task.F / (f * task.tau)
+                obj += inv_N_act * gamma_w * params.gamma_j * f * f * task.F / uav.E_max
     return obj
 
 

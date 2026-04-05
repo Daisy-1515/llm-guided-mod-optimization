@@ -202,25 +202,10 @@ class TestGenerateNewHarmonyWithSnapshot:
         assert parent_snapshot is None or isinstance(parent_snapshot, (dict, Level2Snapshot)), \
             "parent_snapshot should be None, dict, or Level2Snapshot"
 
-    @pytest.mark.skipif(
-        not os.environ.get("OPENAI_API_KEY"),
-        reason="Requires LLM API configuration"
-    )
-    def test_condition_t_equals_0_is_integer_comparison(self, hs_bundle_with_bcd):
-        """验证修复: 条件应是 t == 0 (整数比较) 而非 't' == 0 (字符串比较)"""
-        config, scenario = hs_bundle_with_bcd
-        pop = hsPopulation(config, scenario, individual_type="edge_uav")
-
-        # 初始化种群
-        init_pop = pop.initialize_population()
-
-        # 反复调用 generate_new_harmony 应能正常工作
-        for _ in range(3):
-            p, way, parent_snapshot = pop.generate_new_harmony(init_pop)
-            # 如果仍是字符串比较 't' == 0，parent_snapshot 永远为 None
-            # 如果修复正确，可能会有非 None 的快照
-            assert isinstance(p, dict), "p should be dict"
-            assert isinstance(way, str), "way should be str"
+    # NOTE: test_condition_t_equals_0_is_integer_comparison 已删除
+    # 原测试依赖 LLM API 但验证的是简单条件逻辑，已被其他测试覆盖：
+    # - test_extract_snapshot_when_bcd_enabled 验证快照提取
+    # - test_generate_new_harmony_returns_three_tuple 验证返回值结构
 
 
 class TestMakeIndividualWithParentSnapshot:
