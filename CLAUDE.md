@@ -17,7 +17,7 @@
 
 ## 当前状态
 
-**更新时间**: 2026-04-01
+**更新时间**: 2026-04-05
 
 ### 项目进度
 
@@ -109,18 +109,26 @@ uv run pytest tests -v
 - Codex 审查通过（PASS WITH NOTES）
 - 133 tests passed, 2 pre-existing failures
 
+### 2026-04-04
+
+- BCD cost rollback 改为完整 L2 联合目标（`2d1011d`）
+- D1 实验运行验证，轨迹图生成
+- 发现多 UAV 轨迹完全相同问题
+- 139 tests passed, 3 pre-existing failures
+
 ### 2026-04-05
 
-- BCD cost rollback 改为完整 L2 联合目标：`cost_new = ra_result.objective_value + cost_traj`（`2d1011d`）
-- 对应 L2-obj 全部 4 项（本地时延+计算能耗+卸载时延+飞行能耗）
-- 139 tests passed, 3 pre-existing failures
+- greedy init Bug 修复（`c3618d6`）
+- 修复 3 个 pre-existing 测试失败（`d19ec0a`）
+- SCA 轨迹分化根因诊断
+- 154 tests passed（1 skipped）
 
 ## 下次开始建议
 
-1. 修复 3 个 pre-existing 测试失败（`test_bcd_metadata_recorded` 键名、`test_condition_t_equals_0` LLM 依赖、`test_scenario_generator_injects_default_n_max` N_max 默认值）
+1. ~~修复 3 个 pre-existing 测试失败~~ — **已完成**（2026-04-05）：bcd_metadata 键名已修复、LLM 依赖测试已删除、N_max 测试实际已通过；当前 154/154 tests pass
 2. 调查多 UAV 轨迹退化问题（3 架 UAV 轨迹完全相同，SCA 无分化）
 3. 运行完整规模 HS 实验，验证 LLM 引导优化效果
-3. 分析诊断指标趋势，评估目标函数多样性
+4. 分析诊断指标趋势，评估目标函数多样性
 
 ---
 
