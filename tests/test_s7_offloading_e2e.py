@@ -119,9 +119,10 @@ def test_a_baseline_all_local(scenario_bundle):
     assert feasible, "should be feasible with all-local fallback"
     # A2
     assert cost > 0, f"cost should be positive, got {cost}"
-    # A2.5: 退化路径原因 — 无可卸载候选 (tau 偏紧, offload 全不可行)
-    assert result.diagnostics["offload_feasible_ratio"] == 0.0, \
-        f"degenerate path: offload_feasible_ratio should be 0, " \
+    # A2.5: 退化路径原因 — tau 偏紧，即使 greedy 轨迹让部分对可行，
+    # 大部分仍不可行，允许小比例可行对 (< 10%)
+    assert result.diagnostics["offload_feasible_ratio"] < 0.10, \
+        f"degenerate path: offload_feasible_ratio should be < 0.10, " \
         f"got {result.diagnostics['offload_feasible_ratio']}"
     # A3
     n_tasks = _task_count(scenario)

@@ -29,7 +29,7 @@ Scalar3D = dict[int, dict[int, dict[int, float]]]         # [i][j][t] 或 [j][i]
 Trajectory2D = dict[int, dict[int, tuple[float, float]]]  # q[j][t] = (x, y)
 
 Level2Source = Literal["init", "prev_bcd", "history_avg", "custom"]
-InitPolicy = Literal["paper_default", "custom"]
+InitPolicy = Literal["paper_default", "greedy", "custom"]
 
 
 # =====================================================================
@@ -254,7 +254,7 @@ class PrecomputeResult:
 def make_initial_level2_snapshot(
     scenario: EdgeUavScenario,
     *,
-    policy: InitPolicy = "paper_default",
+    policy: InitPolicy = "greedy",
 ) -> Level2Snapshot:
     """构造首次 BCD 迭代（k=0）的 Level-2 默认快照。
 
@@ -266,6 +266,9 @@ def make_initial_level2_snapshot(
     """
     if policy == "paper_default":
         q = _init_trajectory_linear(scenario)
+        f_edge = _init_frequency_uniform(scenario)
+    elif policy == "greedy":
+        q = _init_trajectory_greedy(scenario)
         f_edge = _init_frequency_uniform(scenario)
     else:
         raise ValueError(f"Unsupported init policy: {policy!r}")
@@ -503,6 +506,157 @@ def _init_trajectory_linear(scenario: EdgeUavScenario) -> Trajectory2D:
             q_j[t] = (x0 + dx * ratio, y0 + dy * ratio)
 
         q[j] = q_j
+
+    return q
+
+
+def _dist_sq(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """平方欧氏距离（仅用于比较，避免 sqrt）。"""
+    dx = a[0] - b[0]
+    dy = a[1] - b[1]
+    return dx * dx + dy * dy
+
+
+def _interpolate_waypoints(
+    waypoints: list[tuple[float, float]],
+    time_slots: list[int],
+) -> dict[int, tuple[float, float]]:
+    """按段距比例分配时隙 + 线性插值。
+
+    waypoints: 至少 2 个点 [start, wp1, wp2, ..., end]
+    time_slots: 长度 T 的列表
+
+    返回 {t: (x, y)}，保证首尾精确对齐。
+    """
+    T = len(time_slots)
+    n_seg = len(waypoints) - 1
+
+    assert len(waypoints) >= 2, f"waypoints must have >= 2 points, got {len(waypoints)}"
+    assert len(time_slots) >= 1, f"time_slots must be non-empty"
+
+    if T == 1:
+        return {time_slots[0]: waypoints[0]}
+
+    # 各段欧氏距离
+    seg_dists: list[float] = []
+    for s in range(n_seg):
+        seg_dists.append(math.sqrt(_dist_sq(waypoints[s], waypoints[s + 1])))
+
+    total_dist = sum(seg_dists)
+
+    # 按距离比例分配 T-1 个间隔给各段
+    intervals = T - 1  # 总可分配间隔数
+    slots_per_seg: list[int] = [0] * n_seg
+
+    if total_dist < 1e-12:
+        # 所有航路点重合，均分间隔给第一段
+        slots_per_seg[0] = intervals
+    else:
+        # 按比例分配，保证总和 = intervals
+        fractional = [seg_dists[s] / total_dist * intervals for s in range(n_seg)]
+        # floor 分配
+        for s in range(n_seg):
+            slots_per_seg[s] = int(fractional[s])
+        # 分配余数给误差最大的段
+        remainder = intervals - sum(slots_per_seg)
+        errors = [(fractional[s] - slots_per_seg[s], s) for s in range(n_seg)]
+        errors.sort(reverse=True)
+        for idx in range(remainder):
+            slots_per_seg[errors[idx][1]] += 1
+
+    # 保证第一段至少分到 1 个 slot，防止起点丢失
+    if slots_per_seg[0] == 0:
+        # 从最后一个有 >1 slot 的段借一个
+        for donor in range(n_seg - 1, 0, -1):
+            if slots_per_seg[donor] > 1:
+                slots_per_seg[donor] -= 1
+                slots_per_seg[0] = 1
+                break
+        else:
+            # 所有段都只有 0 或 1 个 slot，把最后一段的给第一段
+            for donor in range(n_seg - 1, 0, -1):
+                if slots_per_seg[donor] > 0:
+                    slots_per_seg[donor] -= 1
+                    slots_per_seg[0] = 1
+                    break
+
+    # 段内线性插值
+    q: dict[int, tuple[float, float]] = {}
+    t_cursor = 0  # 当前已填充的 time_slots 索引
+
+    for s in range(n_seg):
+        n_slots_in_seg = slots_per_seg[s]
+        x0, y0 = waypoints[s]
+        x1, y1 = waypoints[s + 1]
+
+        for k in range(n_slots_in_seg):
+            ratio = k / n_slots_in_seg if n_slots_in_seg > 0 else 0.0
+            q[time_slots[t_cursor]] = (x0 + (x1 - x0) * ratio, y0 + (y1 - y0) * ratio)
+            t_cursor += 1
+
+    # 最后一个时隙精确对齐终点
+    q[time_slots[-1]] = waypoints[-1]
+
+    return q
+
+
+def _init_trajectory_greedy(scenario: EdgeUavScenario) -> Trajectory2D:
+    """贪心经由任务点的多样化轨迹初始化。
+
+    算法:
+    1. Round-robin 贪心分配任务：UAV 0/1/2 轮流选离自己当前位置最近的未访问任务
+    2. 构造航路点 [depot, task_a, task_b, ..., depot_end]
+    3. 按段距比例分配时隙 + 线性插值
+    4. 无任务时退化为直线
+    """
+    uav_ids = sorted(scenario.uavs.keys())
+    task_ids = sorted(scenario.tasks.keys())
+    time_slots = scenario.time_slots
+
+    # 每架 UAV 的任务分配列表
+    uav_tasks: dict[int, list[int]] = {j: [] for j in uav_ids}
+    # 每架 UAV 的当前位置（用于贪心选择）
+    uav_cursor: dict[int, tuple[float, float]] = {
+        j: (float(scenario.uavs[j].pos[0]), float(scenario.uavs[j].pos[1]))
+        for j in uav_ids
+    }
+
+    remaining = set(task_ids)
+    n_uavs = len(uav_ids)
+    turn = 0  # round-robin 计数器
+
+    while remaining:
+        j = uav_ids[turn % n_uavs]
+        cur = uav_cursor[j]
+
+        # 找最近的未访问任务
+        best_i = None
+        best_d = float("inf")
+        for i in remaining:
+            d = _dist_sq(cur, scenario.tasks[i].pos)
+            if d < best_d or (d == best_d and (best_i is None or i < best_i)):
+                best_d = d
+                best_i = i
+
+        assert best_i is not None
+        uav_tasks[j].append(best_i)
+        uav_cursor[j] = scenario.tasks[best_i].pos
+        remaining.discard(best_i)
+        turn += 1
+
+    # 构造航路点并插值
+    q: Trajectory2D = {}
+    for j in uav_ids:
+        uav = scenario.uavs[j]
+        start = (float(uav.pos[0]), float(uav.pos[1]))
+        end = (float(uav.pos_final[0]), float(uav.pos_final[1]))
+
+        waypoints: list[tuple[float, float]] = [start]
+        for i in uav_tasks[j]:
+            waypoints.append(scenario.tasks[i].pos)
+        waypoints.append(end)
+
+        q[j] = _interpolate_waypoints(waypoints, time_slots)
 
     return q
 
