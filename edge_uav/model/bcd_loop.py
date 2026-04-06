@@ -310,7 +310,8 @@ def adapt_f_edge_for_snapshot(
 
     ResourceAllocResult.f_edge may be sparse on the time-slot axis (only
     offloaded tasks have values). For snapshot compatibility, we densify to
-    [j][i][t], filling missing keys with 0.0, and validate provided values.
+    [j][i][t], filling missing keys with f_max/N_tasks fallback, and validate
+    provided values.
 
     Args:
         scenario: EdgeUavScenario with tasks, uavs, time_slots
@@ -319,7 +320,7 @@ def adapt_f_edge_for_snapshot(
         eps_freq: Minimum frequency threshold (Hz)
 
     Returns:
-        f_edge_adapted: Scalar3D [j][i][t], missing keys filled as 0.0
+        f_edge_adapted: Scalar3D [j][i][t], missing keys filled with f_max/N_tasks fallback
 
     Raises:
         ValueError: If provided values are invalid (NaN/inf/negative)
@@ -344,8 +345,10 @@ def adapt_f_edge_for_snapshot(
             for t in time_slots:
                 v = f_ji.get(t)
                 if v is None:
-                    # Missing key means "not offloaded at this slot"
-                    f_edge_adapted[j][i][t] = 0.0
+                    # Missing key means "not offloaded at this slot".
+                    # Use f_max/N_tasks fallback so the edge remains a viable candidate
+                    # in the next BCD iteration; 0.0 would cause big_m_delay in precompute.
+                    f_edge_adapted[j][i][t] = uavs[j].f_max / max(len(tasks), 1)
                 elif not math.isfinite(v):
                     errors.append(f"f_edge[{j}][{i}][{t}] = {v} is NaN/inf")
                 elif v < 0:
@@ -492,6 +495,7 @@ def run_bcd_loop(
     objective_acceptance_status = "default_obj" if dynamic_obj_func is None else "unknown"
 
     # -------- BCD outer loop --------
+    converged_flag = False
     for k in range(max_bcd_iter):
         logger.info(f"BCD iteration {k + 1}/{max_bcd_iter}")
 
@@ -685,7 +689,7 @@ def run_bcd_loop(
         else:
             logger.info(f"Cost did not improve: {cost_new:.6f} >= {best_cost:.6f}")
 
-        cost_history.append(best_cost)
+        cost_history.append(cost_new)
 
         # -------- P9: Convergence check --------
         if k > 0:
@@ -695,6 +699,7 @@ def run_bcd_loop(
             logger.info(f"Relative cost gap: {relative_gap:.6e} (threshold: {eps_bcd})")
             if relative_gap < eps_bcd:
                 logger.info(f"BCD converged at iteration {k + 1}")
+                converged_flag = True
                 break
         else:
             logger.debug("Skipping convergence check at iteration 0")
@@ -704,7 +709,7 @@ def run_bcd_loop(
         f"BCD loop completed: "
         f"{len(cost_history)} iterations, "
         f"final cost={best_cost:.6f}, "
-        f"converged={len(cost_history) < max_bcd_iter + 1}"
+        f"converged={converged_flag}"
     )
 
     # final_precompute_diagnostics must always describe the returned best_snapshot.
@@ -737,7 +742,7 @@ def run_bcd_loop(
         offloading_outputs=offloading_outputs,
         total_cost=best_cost,
         bcd_iterations=len(cost_history),
-        converged=(len(cost_history) < max_bcd_iter + 1),
+        converged=converged_flag,
         cost_history=cost_history,
         solution_details=solution_details,
         offloading_error_message=offloading_error_message,
