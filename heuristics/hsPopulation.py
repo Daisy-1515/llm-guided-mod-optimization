@@ -85,9 +85,24 @@ class hsPopulation:
             raise RuntimeError(f"initialize_population 失败: {e}") from e
 
     def generate_new_population(self, pop):
-        """基于当前种群生成新一代个体。"""
+        """基于当前种群生成新一代个体。
+
+        每代强制生成 1 个以全局最优（pop[0]）为亲本的变异子代（精英种子），
+        其余 popsize-1 个按正常 HS 机制生成。
+        """
         try:
-            return self._run_parallel(self.get_new_ind, pop)
+            with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
+                elite_future = executor.submit(self.get_new_ind, pop, True)
+                normal_futures = [
+                    executor.submit(self.get_new_ind, pop, False)
+                    for _ in range(self.popsize - 1)
+                ]
+                results = [elite_future.result(timeout=self.timeout)]
+                results += [
+                    f.result(timeout=self.timeout)
+                    for f in as_completed(normal_futures, timeout=self.timeout)
+                ]
+            return results
         except Exception as e:
             raise RuntimeError(f"generate_new_population 失败: {e}") from e
 
@@ -148,9 +163,9 @@ class hsPopulation:
             ind.runOptModel([""]*self.steps, [WAY_RANDOM] * self.steps)
         return ind.promptHistory
 
-    def get_new_ind(self, pop):
+    def get_new_ind(self, pop, force_elite: bool = False):
         """获取通过和弦搜索生成的新个体。"""
-        p, way, parent_snapshot = self.generate_new_harmony(pop)
+        p, way, parent_snapshot = self.generate_new_harmony(pop, force_elite=force_elite)
 
         # Phase⑥ Step4: 如果有父代快照，传递用于 BCD 热启动
         ind = self._make_individual(parent_snapshot=parent_snapshot)
@@ -160,15 +175,31 @@ class hsPopulation:
 
         return ind.promptHistory
 
-    def generate_new_harmony(self, pop):
+    def generate_new_harmony(self, pop, force_elite: bool = False):
         """生成新和弦 (New Harmony)，返回 (prompt, way, parent_snapshot)。
 
         Phase⑥ Step4: 支持热启动快照传递
+        force_elite=True: 跳过 HMCR，强制以 pop[0]（全局最优）为亲本做 PITCH/CROSS 变异。
         """
         p = []
         way = []
         parent_snapshot = None  # Phase⑥ Step4: 热启动快照
         rd = max(int(self.popsize / 2), 0)
+
+        # 精英种子：强制从全局最优变异，保证每代都探索最优邻域
+        if force_elite:
+            ind = pop[0]
+            if self._is_edge_uav:
+                parent_snapshot = self._extract_parent_snapshot(ind)
+            parent = self.shrink_token_size(ind)
+            p.append(parent)
+            if self._is_edge_uav:
+                way.append(random.choice([WAY_PITCH, WAY_CROSS]))
+            else:
+                way.append(WAY_PITCH)
+            if self._is_edge_uav:
+                return p[0], way[0], parent_snapshot
+            return p, way, parent_snapshot
 
         for t in range(self.steps):
             if random.random() >= self.HMCR:
