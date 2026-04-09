@@ -9,6 +9,7 @@ import math
 from edge_uav.model.precompute import (
     _channel_gain,
     _rate_from_gain,
+    _rate_from_gain_sinr,
     _local_delay,
     _offload_delay,
     _edge_energy,
@@ -99,6 +100,60 @@ class TestRateFromGain:
             assert False, "应当抛出 TypeError"
         except TypeError:
             pass
+
+
+# =====================================================================
+# _rate_from_gain_sinr
+# =====================================================================
+
+class TestRateFromGainSinr:
+    """SINR 速率 r = B * log1p(P*g/(N0+I)) / ln(2)。"""
+
+    def test_zero_interference_equals_snr(self):
+        """interference=0 时应与 _rate_from_gain 结果完全一致。"""
+        gain = 1e-5 / 140_000.0
+        rate_snr = _rate_from_gain(
+            gain, bandwidth=1e6, tx_power=0.5,
+            noise_power=1e-10, eps_rate=EPS_RATE,
+        )
+        rate_sinr = _rate_from_gain_sinr(
+            gain, bandwidth=1e6, tx_power=0.5,
+            noise_power=1e-10, interference=0.0, eps_rate=EPS_RATE,
+        )
+        assert abs(rate_sinr - rate_snr) < 1e-9
+
+    def test_nonzero_interference_lowers_rate(self):
+        """加入干扰后速率应严格低于纯 SNR 速率。"""
+        gain = 1e-5 / 140_000.0
+        rate_snr = _rate_from_gain(
+            gain, bandwidth=1e6, tx_power=0.5,
+            noise_power=1e-10, eps_rate=EPS_RATE,
+        )
+        rate_sinr = _rate_from_gain_sinr(
+            gain, bandwidth=1e6, tx_power=0.5,
+            noise_power=1e-10, interference=1e-10, eps_rate=EPS_RATE,
+        )
+        assert rate_sinr < rate_snr
+
+    def test_manual_reference(self):
+        """手算: g=7.142857e-11, I=N0=1e-10, SINR=P*g/(N0+I)=P*g/(2*N0)。"""
+        gain = 1e-5 / 140_000.0
+        p, b, n0 = 0.5, 1e6, 1e-10
+        sinr = p * gain / (n0 + n0)           # I = N0
+        expected = b * math.log1p(sinr) / math.log(2.0)
+        rate = _rate_from_gain_sinr(
+            gain, bandwidth=b, tx_power=p,
+            noise_power=n0, interference=n0, eps_rate=EPS_RATE,
+        )
+        assert abs(rate - expected) < 1e-6
+
+    def test_large_interference_hits_eps_floor(self):
+        """干扰极大时 SINR→0，速率兜底到 eps_rate。"""
+        rate = _rate_from_gain_sinr(
+            1e-20, bandwidth=1e6, tx_power=0.5,
+            noise_power=1e-10, interference=1e10, eps_rate=42.0,
+        )
+        assert rate == 42.0
 
 
 # =====================================================================

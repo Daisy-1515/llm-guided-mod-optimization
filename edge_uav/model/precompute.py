@@ -362,6 +362,32 @@ def precompute_offloading_inputs(
     uplink_rates: list[float] = []
     downlink_rates: list[float] = []
 
+    # ---- Step 0: SINR 预计算 — 收集活跃信道增益，构造最坏情形干扰总量 ----
+    # _sinr_gains[(i, j, t)]: 活跃 task i 在时隙 t 至 UAV j 的信道增益
+    _sinr_gains: dict[tuple[int, int, int], float] = {}
+    for _i, _task in tasks.items():
+        for _t in time_slots:
+            if not bool(_task.active.get(_t, False)):
+                continue
+            for _j in uavs:
+                _sinr_gains[(_i, _j, _t)] = _channel_gain(
+                    _task.pos,
+                    snapshot.q[_j][_t],
+                    H=params.H,
+                    rho_0=params.rho_0,
+                    eps_dist_sq=params.eps_dist_sq,
+                )
+
+    # _total_interf[(j, t)] = Σ_k P_i * g_{k,j,t}，k 遍历全部活跃 task
+    # 计算单 task 干扰时减去自身：I_{i,j,t} = _total_interf[(j,t)] - P_i * g_{i,j,t}
+    _total_interf: dict[tuple[int, int], float] = {}
+    for _j in uavs:
+        for _t in time_slots:
+            _total_interf[(_j, _t)] = sum(
+                params.P_i * _sinr_gains.get((_k, _j, _t), 0.0)
+                for _k in tasks
+            )
+
     # ---- Step 1 + Step 2: 本地时延 / 卸载时延 / 能耗 ----
     for i, task in tasks.items():
         tau_limit = float(task.tau) + params.tau_tol
@@ -402,18 +428,28 @@ def precompute_offloading_inputs(
 
             # 遍历 UAV：卸载时延 + 能耗
             for j in uavs:
-                gain = _channel_gain(
-                    task.pos,
-                    snapshot.q[j][t],
-                    H=params.H,
-                    rho_0=params.rho_0,
-                    eps_dist_sq=params.eps_dist_sq,
-                )
-                r_up = _rate_from_gain(
+                gain = _sinr_gains.get((i, j, t))
+                if gain is None:
+                    # 非活跃时隙（active_only=False 时出现），退回内联计算
+                    gain = _channel_gain(
+                        task.pos,
+                        snapshot.q[j][t],
+                        H=params.H,
+                        rho_0=params.rho_0,
+                        eps_dist_sq=params.eps_dist_sq,
+                    )
+                    interference_up = 0.0
+                else:
+                    # 最坏情形 SINR：干扰 = 所有活跃 task 总干扰 - 自身
+                    interference_up = max(
+                        0.0, _total_interf[(j, t)] - params.P_i * gain
+                    )
+                r_up = _rate_from_gain_sinr(
                     gain,
                     bandwidth=params.B_up,
                     tx_power=params.P_i,
                     noise_power=params.N_0,
+                    interference=interference_up,
                     eps_rate=params.eps_rate,
                 )
                 r_down = _rate_from_gain(
@@ -766,6 +802,26 @@ def _rate_from_gain(
     """Shannon 速率: r = B * log1p(P*g/N0) / ln(2)。低速率兜底 eps_rate。"""
     snr = tx_power * gain / noise_power
     rate = bandwidth * math.log1p(snr) / _LN2
+    if rate < eps_rate:
+        return eps_rate
+    return rate
+
+
+def _rate_from_gain_sinr(
+    gain: float,
+    *,
+    bandwidth: float,
+    tx_power: float,
+    noise_power: float,
+    interference: float,
+    eps_rate: float,
+) -> float:
+    """Shannon SINR 速率: r = B * log1p(P*g/(N0+I)) / ln(2)。低速率兜底 eps_rate。
+
+    interference 为同频其他 UE 的干扰功率之和（W）。
+    """
+    sinr = tx_power * gain / (noise_power + interference)
+    rate = bandwidth * math.log1p(sinr) / _LN2
     if rate < eps_rate:
         return eps_rate
     return rate

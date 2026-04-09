@@ -431,6 +431,9 @@ class hsIndividualEdgeUav:
                     bcd_result.offloading_outputs,
                     final_precompute_result,
                     self.scenario,
+                    delay_weight=getattr(self.config, "alpha", 1.0),
+                    energy_weight=getattr(self.config, "gamma_w", 1.0),
+                    prop_weight=getattr(self.config, "lambda_w", 1.0),
                 )
                 full_info["bcd_enabled"] = True
                 full_info["bcd_meta"] = bcd_meta
@@ -465,6 +468,9 @@ class hsIndividualEdgeUav:
                     outputs = model.getOutputs()
                     score = evaluate_solution(
                         outputs, self.precompute_result, self.scenario,
+                        delay_weight=getattr(self.config, "alpha", 1.0),
+                        energy_weight=getattr(self.config, "gamma_w", 1.0),
+                        prop_weight=getattr(self.config, "lambda_w", 1.0),
                     )
                 except Exception as fallback_exc:
                     print(f"[hsIndividualEdgeUav] Level 1 fallback also failed: {fallback_exc}")
@@ -487,6 +493,9 @@ class hsIndividualEdgeUav:
                 outputs = model.getOutputs()
                 score = evaluate_solution(
                     outputs, self.precompute_result, self.scenario,
+                    delay_weight=getattr(self.config, "alpha", 1.0),
+                    energy_weight=getattr(self.config, "gamma_w", 1.0),
+                    prop_weight=getattr(self.config, "lambda_w", 1.0),
                 )
                 full_info["bcd_enabled"] = False
             except Exception as exc:

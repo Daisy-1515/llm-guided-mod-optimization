@@ -93,13 +93,15 @@ def evaluate_solution(
     *,
     delay_weight: float = 1.0,
     energy_weight: float = 1.0,
+    prop_weight: float = 1.0,
     deadline_weight: float = 0.0,
     balance_weight: float = 0.0,
 ) -> float:
     """固定评估函数，独立于 LLM 生成的目标函数。
 
     score = delay_weight  * sum(delay_i_t / tau_i)
-          + energy_weight * (sum(E_comp_j_i_t / E_max_j) + sum(E_prop_j / E_max_j))
+          + energy_weight * sum(E_comp_j_i_t / E_max_j)
+          + prop_weight   * sum(E_prop_j / E_max_j)
           + deadline_weight * sum(max(0, delay/tau - 1))
           + balance_weight * load_variance_term
 
@@ -111,8 +113,12 @@ def evaluate_solution(
         预计算结果（D_hat_local, D_hat_offload, E_hat_comp, E_prop）。
     scenario : EdgeUavScenario
         场景数据。
-    delay_weight, energy_weight : float
-        归一化时延/能耗权重，默认各 1.0。
+    delay_weight : float
+        时延权重 α，默认 1.0。
+    energy_weight : float
+        计算能耗权重 γ，默认 1.0。
+    prop_weight : float
+        飞行能耗权重 λ，默认 1.0。
     deadline_weight : float
         截止期超限罚项权重，默认 0.0（BLP 硬约束已保证）。
     balance_weight : float
@@ -134,6 +140,7 @@ def evaluate_solution(
             assignments, precompute_result, scenario,
             delay_weight=delay_weight,
             energy_weight=energy_weight,
+            prop_weight=prop_weight,
             deadline_weight=deadline_weight,
             balance_weight=balance_weight,
         )
@@ -143,14 +150,14 @@ def evaluate_solution(
 
 def _compute_score(
     assignments, precompute_result, scenario,
-    *, delay_weight, energy_weight, deadline_weight, balance_weight,
+    *, delay_weight, energy_weight, prop_weight, deadline_weight, balance_weight,
 ):
     """内部评分计算，抛出异常由调用方统一处理。
 
     评分公式（聚合归一化版本）：
         score = (1/N_act) × delay_weight × delay_term
               + (1/N_act) × energy_weight × energy_comp_term
-              + (1/N_fly) × energy_weight × energy_prop_term
+              + (1/N_fly) × prop_weight × energy_prop_term
               + deadline_weight × deadline_term
               + balance_weight × balance_term
 
@@ -220,7 +227,7 @@ def _compute_score(
     return (
         inv_N_act * delay_weight * delay_term
         + inv_N_act * energy_weight * energy_comp_term
-        + inv_N_fly * energy_weight * energy_prop_term
+        + inv_N_fly * prop_weight * energy_prop_term
         + deadline_weight * deadline_term
         + balance_weight * balance_term
     )

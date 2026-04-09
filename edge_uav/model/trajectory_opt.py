@@ -250,11 +250,19 @@ def solve_trajectory_sca(
             accepted_candidate = fallback_inaccurate
 
         if accepted_candidate is None:
-            raise ValueError(
-                "SCA iteration "
-                f"{sca_k} failed: all candidate solvers were infeasible or unsafe. "
-                f"Last status={solver_status}"
+            if sca_k == 0:
+                # 第一轮失败：无任何可用解，硬失败
+                raise ValueError(
+                    "SCA iteration "
+                    f"{sca_k} failed: all candidate solvers were infeasible or unsafe. "
+                    f"Last status={solver_status}"
+                )
+            # sca_k > 0：已有上一轮的 q_ref，提前终止并返回上一轮结果
+            print(
+                f"[WARNING] SCA iteration {sca_k} failed (all solvers infeasible/inaccurate), "
+                f"stopping early and using iteration {sca_k - 1} result."
             )
+            break
 
         q_ref = accepted_candidate["q"]
         final_safety_diag = accepted_candidate["safety_diag"]
@@ -629,35 +637,35 @@ def _extract_active_offloads(
 
 def _add_communication_delay_socp_constraint(
     constraints: list,
+    objective_terms: list,
     pos_diff: cp.Expression,
     H: float,
     rate_safe: cp.Expression,
     tau_comm_budget: float,
     *,
+    slack_penalty: float,
     payload_bits: float = 1.0,
     name_suffix: str = "",
-) -> None:
-    """追加服从对标于 DCP 标准格式约限规制的网络通信羁滞防越超卡线项。
+) -> cp.Variable:
+    """追加带松弛变量的外点罚函数形式通信截止期约束（外点罚函数法）。
 
-    该原本的算式表现原型为: (D_l + D_r) / rate_safe <= tau_comm_budget
-    透过下限直线牵引将之扳置呈合乎线状等式并排关系的形式：
-        payload_bits <= tau_comm_budget * rate_safe
+    原约束：(D_l + D_r) / rate_safe <= tau_comm_budget
+    等价形式：payload_bits <= tau_comm_budget * rate_safe
 
-    参数:
-        constraints: 支持推拉添加新限制条件。
-        pos_diff: 回退重构处理后所余遗下来没在起效的存悬变量项。
-        H: 废置没再应用。
-        rate_safe: 提供对信号速率 r(z) 兜保线垫的单层下沿极限直向率度 (bps)。
-        tau_comm_budget: 经费时限段额封量界限 (s)。
-        payload_bits: 合起数据 D_l + D_r 传输内容总数定值 (bits)。
-        name_suffix: 添加用于后缀调试追查标识志字。
+    由于 rate_safe 是 SCA 线性化下界，当 UAV 远离任务时下界过小，
+    硬约束在线性化点处可能 infeasible。改为外点罚函数形式：
+        payload_bits <= tau_comm_budget * rate_safe + slack
+        objective += slack_penalty * slack   (slack >= 0)
+
+    当 slack_penalty → ∞ 时收敛到原硬约束。与安全距离处理模式一致。
     """
-    # 让此通率保障维持在不坠超触底非零面以外以供护核计算系统跑脱轨道
-    constraints.append(rate_safe >= 1e-12)
+    slack_var = cp.Variable(nonneg=True, name=f"comm_slack_{name_suffix}")
 
-    # 向限制库灌写入递拉直线牵平后法则条律: 直接挂向负荷总宽 = 时间限制阈 * 安全线度率网宽
-    # 等效作用为: payload <= tau * rate  (完美响应了凸限制下的正比例缩涨限定)
-    constraints.append(payload_bits <= tau_comm_budget * rate_safe)
+    constraints.append(rate_safe >= 1e-12)
+    constraints.append(payload_bits <= tau_comm_budget * rate_safe + slack_var)
+    objective_terms.append(slack_penalty * slack_var)
+
+    return slack_var
 
 
 def _add_safety_separation_socp_constraint(
@@ -866,10 +874,11 @@ def _build_sca_subproblem(
             - inv_N_act * (D_l_i / r_up_ref ** 2) * r_up_lb \
             - inv_N_act * (D_r_i / r_down_ref ** 2) * r_down_lb
 
-        # Deadline constraint: (D_l + D_r) / r_up <= tau_comm_budget
+        # Deadline constraint (外点罚函数): (D_l + D_r) / r_up <= tau_comm + slack
         payload_bits = D_l_i + D_r_i
         _add_communication_delay_socp_constraint(
-            constraints, pos_diff, H, r_up_lb, tau_comm_budget,
+            constraints, objective_terms, pos_diff, H, r_up_lb, tau_comm_budget,
+            slack_penalty=safe_slack_penalty,
             payload_bits=payload_bits,
             name_suffix=f"{j}_{i}_{t}",
         )

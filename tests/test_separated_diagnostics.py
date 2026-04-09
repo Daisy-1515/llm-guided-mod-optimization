@@ -27,7 +27,7 @@ def _load_latest_diagnostics():
     if not pop_result_files:
         return None, f"No population_result_*.json in {latest_run.name}"
 
-    with open(pop_result_files[0]) as f:
+    with open(pop_result_files[0], encoding="utf-8") as f:
         pop_data = json.load(f)
 
     if isinstance(pop_data, list):

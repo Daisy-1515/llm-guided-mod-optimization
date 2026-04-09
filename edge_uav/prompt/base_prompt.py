@@ -155,6 +155,17 @@ class EdgeUavPrompts:
         e_min, e_max_val, e_mean = _stats([u.E_max for u in uavs.values()])
         f_min, f_max_val, f_mean = _stats([u.f_max for u in uavs.values()])
 
+        # 活跃时间窗统计
+        T_total = len(time_slots)
+        window_lengths = [
+            sum(1 for t in time_slots if task.active[t])
+            for task in tasks.values()
+        ]
+        wl_min, wl_max, wl_mean = _stats(window_lengths)
+        tight_threshold = max(1, T_total // 3)
+        tight_count = sum(1 for wl in window_lengths if wl <= tight_threshold)
+        tight_ratio = tight_count / len(window_lengths) if window_lengths else 0.0
+
         def _fmt(val, spec):
             return val if val == "N/A" else format(val, spec)
 
@@ -169,7 +180,12 @@ class EdgeUavPrompts:
             f"- Deadline (tau): min={_fmt(tau_min, '.3f')}s, "
             f"max={_fmt(tau_max, '.3f')}s, mean={_fmt(tau_mean, '.3f')}s\n"
             f"- Total data size (D_l + D_r): min={_fmt(data_min, '.0f')} bits, "
-            f"max={_fmt(data_max, '.0f')} bits, mean={_fmt(data_mean, '.0f')} bits\n\n"
+            f"max={_fmt(data_max, '.0f')} bits, mean={_fmt(data_mean, '.0f')} bits\n"
+            f"- Active window length: min={_fmt(wl_min, 'd') if wl_min != 'N/A' else 'N/A'} slots, "
+            f"max={_fmt(wl_max, 'd') if wl_max != 'N/A' else 'N/A'} slots, "
+            f"mean={_fmt(wl_mean, '.1f') if wl_mean != 'N/A' else 'N/A'} slots (T={T_total})\n"
+            f"- Tight-window tasks (window ≤ {tight_threshold} slots): "
+            f"{tight_ratio:.0%} of tasks\n\n"
             #"【中文注释】任务统计：截止期与数据规模的最小/最大/平均值。\n\n"
 
             "=== UAV Statistics ===\n"
@@ -349,14 +365,29 @@ class EdgeUavPrompts:
             "16. Coefficient diversity — STRONGLY ENCOURAGED:\n"
             "   - Go beyond simple linear ratios (D/tau, E/E_max). Transform scalar constants "
             "with nonlinear functions to reshape the cost landscape:\n"
-            "     * Exponential urgency:  math.exp(k * D_hat / tau)  — sharply penalizes near-deadline tasks\n"
+            "     * Exponential urgency:  math.exp(min(k * D_hat / tau, 3.0))  — k=1.0~2.0 recommended\n"
+            "       (exp(3)≈20, exp(5)≈148, exp(10)≈22000 causes numerical instability)\n"
             "     * Logarithmic saturation:  math.log1p(E_hat / E_max)  — diminishing returns on energy cost\n"
             "     * Square-root smoothing:  math.sqrt(D_hat / tau)  — gentle sub-linear penalty\n"
-            "     * Sigmoid-like focus:  math.tanh(k * (D_hat/tau - threshold))  — step-like penalty near threshold\n"
-            "     * Power-law:  math.pow(D_hat / tau, p)  — tunable convexity (p>1 convex, p<1 concave)\n"
+            "     * Sigmoid-like focus:  math.tanh(k * (D_hat/tau - threshold))  — output in [-1,1], safe\n"
+            "     * Power-law:  math.pow(D_hat / tau, p)  — p=1.5~3.0 recommended, avoid extreme values\n"
             "   - These all produce scalar coefficients, so `f(constant) * binary_var` is linear for Gurobi.\n"
             "   - Combine different transforms across cost components for richer trade-off surfaces.\n"
+            "   - CRITICAL: Keep coefficients in [0.01, 100] range. Values outside [1e-6, 1e6] "
+            "will cause Gurobi numerical issues and BCD solver failures.\n"
             #"【中文注释】16. 系数多样性（强烈建议）：用 exp/log/sqrt/tanh/pow 变换常数系数，丰富目标搜索空间。\n"
+            "# 注意：exp 参数上限 3.0，pow 指数 1.5~3.0，系数范围 [0.01, 100]，避免数值爆炸。\n"
+
+            "17. Time-window urgency — OPTIONAL but RECOMMENDED:\n"
+            "   - Each task i has an active window: a contiguous set of time slots where it can be served.\n"
+            "   - A task with a shorter active window is harder to schedule (fewer opportunities).\n"
+            "   - You MAY scale per-task penalty terms by a window-tightness factor computed as pure Python:\n"
+            "       window_size_i = sum(1 for t in self.timeList if self.task[i].active[t])  # scalar int\n"
+            "       tightness_i   = len(self.timeList) / max(window_size_i, 1)               # scalar float\n"
+            "   - Then multiply inside gb.quicksum, e.g.:\n"
+            "       math.log1p(tightness_i) * D_hat_local[i][t] / task[i].tau * x_local[i,t]\n"
+            "   - window_size_i and tightness_i are pure constants — Python arithmetic is safe here.\n"
+            "   - The scenario statistics section shows the distribution of tight-window tasks.\n"
         )
         return raw.replace("{", "{{").replace("}", "}}")
 

@@ -156,7 +156,7 @@ def test_t4_bcd_recomputes_precompute_for_scoring(scenario_bundle, monkeypatch):
 
     captured = {}
 
-    def fake_evaluate_solution(outputs, precompute_result, scenario_arg):
+    def fake_evaluate_solution(outputs, precompute_result, scenario_arg, **kwargs):
         captured["precompute_result"] = precompute_result
         assert scenario_arg is scenario
         return 7.89

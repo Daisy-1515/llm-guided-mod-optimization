@@ -319,7 +319,12 @@ def solve_default_objective(bundle, *, alpha, gamma_w, evaluation_index):
             mu=None,
             active_only=True,
         )
-        score = evaluate_solution(bcd_result.offloading_outputs, final_precompute, bundle.scenario)
+        score = evaluate_solution(
+            bcd_result.offloading_outputs, final_precompute, bundle.scenario,
+            delay_weight=alpha,
+            energy_weight=gamma_w,
+            prop_weight=getattr(bundle.params, "lambda_w", 1.0),
+        )
         return {
             "evaluation_index": evaluation_index,
             "generation": 0,
@@ -356,7 +361,12 @@ def solve_default_objective(bundle, *, alpha, gamma_w, evaluation_index):
     )
     feasible, solver_cost = model.solveProblem()
     outputs = model.getOutputs()
-    score = evaluate_solution(outputs, bundle.precompute, bundle.scenario)
+    score = evaluate_solution(
+        outputs, bundle.precompute, bundle.scenario,
+        delay_weight=alpha,
+        energy_weight=gamma_w,
+        prop_weight=getattr(bundle.params, "lambda_w", 1.0),
+    )
     return {
         "evaluation_index": evaluation_index,
         "generation": 0,

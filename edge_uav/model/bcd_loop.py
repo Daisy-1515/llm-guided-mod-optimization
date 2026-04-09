@@ -609,8 +609,11 @@ def run_bcd_loop(
                 f"sca_iter={traj_result.sca_iterations}, converged={traj_result.converged}"
             )
         except Exception as e:
-            logger.error(f"Level 2b trajectory optimization failed at iteration {k}: {e}")
-            raise
+            logger.warning(
+                f"Level 2b trajectory optimization failed at iteration {k}: {e}. "
+                f"Stopping BCD early, returning best solution so far."
+            )
+            break
 
         # -------- P6: Update snapshot with new results --------
         try:
