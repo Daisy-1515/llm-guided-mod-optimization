@@ -921,6 +921,8 @@ def _build_sca_subproblem(
                 "obj_slack": obj_slack,
                 "alpha": alpha, "lambda_w": lambda_w,
                 "N_act": N_act, "N_fly": N_fly,
+                "n_uavs": len(scenario.uavs),
+                "n_tasks_active": len({i for _, i, _ in active_offloads}),
             }
             exec(dynamic_traj_obj_func, {}, _ns)  # noqa: S102
             _custom = _ns.get("dynamic_traj_objective")
