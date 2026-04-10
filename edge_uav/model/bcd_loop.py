@@ -430,6 +430,7 @@ def run_bcd_loop(
     cost_rollback_delta: float = 0.05,
     max_rollbacks: int = 2,
     init_policy: InitPolicy = "greedy",
+    bcd_num_restarts: int = 0,
 ) -> BCDResult:
     """Run Block Coordinate Descent (BCD) outer loop for integrated optimization.
 
@@ -708,6 +709,48 @@ def run_bcd_loop(
                 break
         else:
             logger.debug("Skipping convergence check at iteration 0")
+
+    # -------- 多起点重启（Multi-start，逃离鞍点）--------
+    # 当 bcd_num_restarts > 0 时，从随机初始轨迹重跑 BCD，取全局最优。
+    # 递归调用自身（bcd_num_restarts=0 防止无限嵌套）。
+    solution_details["bcd_restarts_tried"] = bcd_num_restarts
+    for _r in range(bcd_num_restarts):
+        try:
+            _restart_snap = make_initial_level2_snapshot(scenario, policy="random_visit")
+            _restart = run_bcd_loop(
+                scenario=scenario,
+                config=config,
+                params=params,
+                traj_params=traj_params,
+                dynamic_obj_func=dynamic_obj_func,
+                dynamic_traj_obj_func=dynamic_traj_obj_func,
+                initial_snapshot=_restart_snap,
+                max_bcd_iter=max_bcd_iter,
+                eps_bcd=eps_bcd,
+                cost_rollback_delta=cost_rollback_delta,
+                max_rollbacks=max_rollbacks,
+                init_policy=init_policy,
+                bcd_num_restarts=0,  # 不再递归
+            )
+            if _restart.total_cost < best_cost:
+                logger.info(
+                    f"[BCD restart {_r + 1}] improved: "
+                    f"{_restart.total_cost:.4f} < {best_cost:.4f}"
+                )
+                best_cost = _restart.total_cost
+                best_snapshot = _restart.snapshot
+                offloading_outputs = _restart.offloading_outputs
+                cost_history = _restart.cost_history
+                converged_flag = _restart.converged
+                offloading_error_message = _restart.offloading_error_message
+                used_default_obj = _restart.used_default_obj
+            else:
+                logger.info(
+                    f"[BCD restart {_r + 1}] no improvement: "
+                    f"{_restart.total_cost:.4f} >= {best_cost:.4f}"
+                )
+        except Exception as _e:
+            logger.warning(f"[BCD restart {_r + 1}] failed: {_e}")
 
     # -------- Finalization --------
     logger.info(

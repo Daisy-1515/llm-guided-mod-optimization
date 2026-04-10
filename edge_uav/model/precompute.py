@@ -30,7 +30,7 @@ Scalar3D = dict[int, dict[int, dict[int, float]]]         # [i][j][t] 或 [j][i]
 Trajectory2D = dict[int, dict[int, tuple[float, float]]]  # q[j][t] = (x, y)
 
 Level2Source = Literal["init", "prev_bcd", "history_avg", "custom"]
-InitPolicy = Literal["paper_default", "greedy", "custom"]
+InitPolicy = Literal["paper_default", "greedy", "custom", "random_visit"]
 
 
 # =====================================================================
@@ -299,6 +299,10 @@ def make_initial_level2_snapshot(
         f_edge = _init_frequency_uniform(scenario)
     elif policy == "greedy":
         q = _init_trajectory_greedy(scenario)
+        f_edge = _init_frequency_uniform(scenario)
+    elif policy == "random_visit":
+        import random as _random
+        q = _init_trajectory_random_visit(scenario, _random.Random())
         f_edge = _init_frequency_uniform(scenario)
     else:
         raise ValueError(f"Unsupported init policy: {policy!r}")
@@ -744,6 +748,39 @@ def _init_trajectory_greedy(scenario: EdgeUavScenario) -> Trajectory2D:
             waypoints.append(scenario.tasks[i].pos)
         waypoints.append(end)
 
+        q[j] = _interpolate_waypoints(waypoints, time_slots)
+
+    return q
+
+
+def _init_trajectory_random_visit(
+    scenario: EdgeUavScenario,
+    rng: "random.Random",
+) -> "Trajectory2D":
+    """随机任务访问顺序的轨迹初始化，专用于 BCD 多起点重启。
+
+    与 _init_trajectory_greedy 相同逻辑，但先随机打乱任务顺序，
+    保证每次重启产生不同轨迹，帮助 BCD 跳出鞍点。
+    """
+    import random as _random  # noqa: F401（仅用于类型标注 fallback）
+
+    uav_ids = sorted(scenario.uavs.keys())
+    task_ids = list(scenario.tasks.keys())
+    rng.shuffle(task_ids)  # 核心：随机打乱，产生不同轨迹
+
+    uav_tasks: dict = {j: [] for j in uav_ids}
+    n_uavs = len(uav_ids)
+    for turn, i in enumerate(task_ids):
+        uav_tasks[uav_ids[turn % n_uavs]].append(i)
+
+    q: dict = {}
+    time_slots = scenario.time_slots
+    for j in uav_ids:
+        waypoints = (
+            [scenario.uavs[j].pos]
+            + [scenario.tasks[i].pos for i in uav_tasks[j]]
+            + [scenario.uavs[j].pos_final]
+        )
         q[j] = _interpolate_waypoints(waypoints, time_slots)
 
     return q

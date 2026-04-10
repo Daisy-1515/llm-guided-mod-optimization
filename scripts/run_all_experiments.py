@@ -310,6 +310,7 @@ def solve_default_objective(bundle, *, alpha, gamma_w, evaluation_index):
             eps_bcd=getattr(bundle.params, 'bcd_eps', 1e-3),
             cost_rollback_delta=getattr(bundle.params, 'bcd_rollback_delta', 0.05),
             max_rollbacks=getattr(bundle.params, 'bcd_max_rollbacks', 2),
+            bcd_num_restarts=getattr(bundle.params, 'bcd_num_restarts', 0),
         )
         # 基于 BCD 最终快照重新预计算，确保 evaluate_solution 使用最优轨迹
         final_precompute = precompute_offloading_inputs(

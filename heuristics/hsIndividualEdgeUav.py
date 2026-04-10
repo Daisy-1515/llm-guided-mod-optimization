@@ -488,6 +488,7 @@ class hsIndividualEdgeUav:
                     eps_bcd=getattr(self.config, 'bcd_eps', 1e-3),
                     cost_rollback_delta=getattr(self.config, 'bcd_rollback_delta', 0.05),
                     max_rollbacks=getattr(self.config, 'bcd_max_rollbacks', 2),
+                    bcd_num_restarts=getattr(self.config, 'bcd_num_restarts', 0),
                 )
                 # 适配返回值
                 feasible, cost, bcd_meta = self._adapt_bcd_result_to_legacy(
