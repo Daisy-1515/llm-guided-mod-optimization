@@ -13,7 +13,7 @@
 - heuristics.hsSorting / heuristics.hsDiversitySorting
 """
 from heuristics.hsPopulation import hsPopulation
-from heuristics.hsSorting import hsSorting, hsDiversitySorting
+from heuristics.hsSorting import hsSorting, hsDedupSorting, hsDiversitySorting
 import datetime
 import json
 import os
@@ -34,7 +34,7 @@ class HarmonySearchSolver:
         os.makedirs(self.out_dir, exist_ok=True)
 
         self.pop = hsPopulation(configPara, scenarioInfo, individual_type=individual_type)
-        self.sort = hsSorting()
+        self.sort = hsDedupSorting(max_same_score=2)
         self.evaluation_history = []
         self.generation_history = []
         print(f"[HS] Solver initialized  run_id={self.run_id}  out={self.out_dir}")

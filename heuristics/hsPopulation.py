@@ -92,7 +92,8 @@ class hsPopulation:
         """
         try:
             with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
-                elite_future = executor.submit(self.get_new_ind, pop, True)
+                force_elite_this_gen = random.random() < 0.3
+                elite_future = executor.submit(self.get_new_ind, pop, force_elite_this_gen)
                 normal_futures = [
                     executor.submit(self.get_new_ind, pop, False)
                     for _ in range(self.popsize - 1)
@@ -184,7 +185,7 @@ class hsPopulation:
         p = []
         way = []
         parent_snapshot = None  # Phase⑥ Step4: 热启动快照
-        rd = max(int(self.popsize / 2), 0)
+        rd = max(int(self.popsize * 0.8), 2)
 
         # 精英种子：强制从全局最优变异，保证每代都探索最优邻域
         if force_elite:

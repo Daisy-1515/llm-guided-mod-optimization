@@ -31,6 +31,36 @@ class hsSorting:
         # 返回前 'popsize' 个个体
         return sorted_population[:popsize]
     
+class hsDedupSorting:
+    """按分数排序 + 限制同分个体数量，防止种群多样性崩溃。
+
+    同分个体超过 max_same_score 时，多余的被挤到后面，
+    为分数不同但排名稍低的个体腾出生存空间。
+    """
+    def __init__(self, max_same_score=2):
+        self.max_same_score = max_same_score
+
+    def sort_population(self, population, popsize):
+        sorted_pop = sorted(population, key=lambda ind: ind['evaluation_score'])
+        selected = []
+        score_count: dict[float, int] = {}
+        overflow = []
+        for ind in sorted_pop:
+            s = ind['evaluation_score']
+            cnt = score_count.get(s, 0)
+            if cnt < self.max_same_score:
+                selected.append(ind)
+                score_count[s] = cnt + 1
+            else:
+                overflow.append(ind)
+        # 用溢出个体填充剩余位置
+        for ind in overflow:
+            if len(selected) >= popsize:
+                break
+            selected.append(ind)
+        return selected[:popsize]
+
+
 class hsDiversitySorting:
     """
     带有多样性考虑的种群排序。
