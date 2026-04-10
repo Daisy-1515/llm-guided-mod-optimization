@@ -423,6 +423,7 @@ def run_bcd_loop(
     params: PrecomputeParams,
     traj_params: TrajectoryOptParams,
     dynamic_obj_func: Optional[str] = None,
+    dynamic_traj_obj_func: Optional[str] = None,
     initial_snapshot: Optional[Level2Snapshot] = None,
     max_bcd_iter: int = 5,
     eps_bcd: float = 1e-3,
@@ -586,6 +587,7 @@ def run_bcd_loop(
                 lambda_w=float(getattr(config, "lambda_w", 1.0)),
                 N_act=precompute_result.N_act,
                 N_fly=precompute_result.N_fly,
+                dynamic_traj_obj_func=dynamic_traj_obj_func,
             )
             q_new, cost_traj = check_trajectory_monotonicity(
                 traj_result, scenario, config

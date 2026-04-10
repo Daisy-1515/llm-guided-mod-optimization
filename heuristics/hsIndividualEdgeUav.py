@@ -23,6 +23,7 @@ from edge_uav.model.precompute import (
 from edge_uav.model.trajectory_opt import TrajectoryOptParams
 from edge_uav.model.bcd_loop import run_bcd_loop, BCDResult
 from edge_uav.prompt.mod_prompt import EdgeUavModPrompts
+from edge_uav.prompt.traj_prompt import TrajectoryPrompts
 from heuristics.hs_way_constants import (
     VALID_EDGE_UAV_WAYS,
     WAY_CROSS,
@@ -30,7 +31,7 @@ from heuristics.hs_way_constants import (
     WAY_PITCH,
     WAY_RANDOM,
 )
-from heuristics.hsUtils import extract_code_hsIndiv
+from heuristics.hsUtils import extract_code_hsIndiv, extract_traj_code_hsIndiv
 
 
 # ---------------------------------------------------------------------------
@@ -357,6 +358,60 @@ class hsIndividualEdgeUav:
         full_info["llm_status"] = "ok"
         return raw_response, full_info
 
+    def _get_l2b_llm_response(self, parent, way):
+        """为 L2b 轨迹目标生成 prompt 并调用 LLM，返回 (response_text, full_info)。
+
+        与 getNewPrompt() 类似，但使用 TrajectoryPrompts 生成不同的 prompt，
+        返回 JSON 包含 traj_obj_code 而非 obj_code。
+        """
+        task_info, uav_info = self.format_scenario_info()
+        full_info = self._make_default_full_info(task_info, uav_info)
+        full_info["llm_status"] = "default"
+
+        if way == "default":
+            return full_info["llm_response"], full_info
+
+        # 构建场景统计信息供 TrajectoryPrompts 使用
+        diag = self.precompute_result.diagnostics
+        stats = {
+            "N_act": self.precompute_result.N_act,
+            "N_fly": self.precompute_result.N_fly,
+            "n_uavs": len(self.scenario.uavs),
+            "n_tasks_active": diag.get("active_task_slots", 0),
+            "alpha": float(getattr(self.config, "alpha", 1.0)),
+            "lambda_w": float(getattr(self.config, "lambda_w", 1.0)),
+        }
+        traj_prompts = TrajectoryPrompts(stats)
+
+        # 提取最优个体的 traj_obj_code 供 way2/way3 使用
+        best_traj_code = None
+        if isinstance(parent, dict):
+            best_traj_code = parent.get("traj_obj_code")
+
+        # 按 way 路由
+        if way == WAY_RANDOM:
+            prompt_text = traj_prompts.get_prompt("way1")
+        elif way == WAY_MEMORY:
+            prompt_text = traj_prompts.get_prompt("way2", best_traj_code)
+        elif way in (WAY_PITCH, WAY_CROSS):
+            prompt_text = traj_prompts.get_prompt("way3", best_traj_code)
+        else:
+            return full_info["llm_response"], full_info
+
+        try:
+            raw_response = str(self._ensure_api().getResponse(prompt_text))
+        except Exception as exc:
+            print(f"[hsIndividualEdgeUav L2b] LLM API error: {exc}")
+            full_info["llm_status"] = "api_error"
+            full_info["llm_error"] = str(exc)
+            return full_info["llm_response"], full_info
+
+        full_info["raw_llm_response"] = raw_response
+        full_info["llm_response"] = raw_response
+        full_info["used_default_obj"] = False
+        full_info["llm_status"] = "ok"
+        return raw_response, full_info
+
     # ------------------------------------------------------------------
     # 主入口
     # ------------------------------------------------------------------
@@ -371,26 +426,46 @@ class hsIndividualEdgeUav:
         parent, way = self._normalize_inputs(parent, way)
         is_default = way not in VALID_EDGE_UAV_WAYS
 
-        # 1) 获取 prompt / LLM 回复
-        response_text, full_info = self.getNewPrompt(parent, way)
+        llm_layer = getattr(self.config, "llm_layer", "L1")
+        traj_func = None  # L2b 轨迹目标函数代码（None → 使用默认）
 
-        # 2) 提取目标函数代码
-        func = None
-        extract_failed = False
-        if not is_default:
-            extracted = extract_code_hsIndiv(response_text)
-            # extract_code_hsIndiv 失败时返回 " "（空格）
-            if isinstance(extracted, str) and extracted.strip():
-                func = extracted
-                # P1-1 fix: 规范化 llm_response 为 JSON（hsDiversitySorting 兼容）
-                full_info["llm_response"] = json.dumps({"obj_code": extracted})
+        if llm_layer == "L2b" and not is_default:
+            # ---- L2b 模式：LLM 控制轨迹目标，L1 使用默认 ----
+            func = None  # L1 使用固定默认目标函数
+            response_text, full_info = self._get_l2b_llm_response(parent, way)
+            traj_extracted = extract_traj_code_hsIndiv(response_text)
+            if isinstance(traj_extracted, str) and traj_extracted.strip():
+                traj_func = traj_extracted
+                full_info["llm_response"] = json.dumps({"traj_obj_code": traj_extracted})
+                full_info["traj_obj_code"] = traj_extracted
             else:
-                # P1-2 fix: 提取失败 → 替换为合成 JSON + 哨兵值
-                extract_failed = True
                 full_info["llm_response"] = self._synthesize_llm_response()
                 full_info["used_default_obj"] = True
                 full_info["llm_status"] = "parse_error"
-                full_info["llm_error"] = f"extract_code_hsIndiv returned empty for way={way}"
+                full_info["llm_error"] = f"extract_traj_code_hsIndiv returned empty for way={way}"
+            extract_failed = traj_func is None
+        else:
+            # ---- L1 模式（默认）：LLM 控制 L1 任务分配目标 ----
+            # 1) 获取 prompt / LLM 回复
+            response_text, full_info = self.getNewPrompt(parent, way)
+
+            # 2) 提取目标函数代码
+            func = None
+            extract_failed = False
+            if not is_default:
+                extracted = extract_code_hsIndiv(response_text)
+                # extract_code_hsIndiv 失败时返回 " "（空格）
+                if isinstance(extracted, str) and extracted.strip():
+                    func = extracted
+                    # P1-1 fix: 规范化 llm_response 为 JSON（hsDiversitySorting 兼容）
+                    full_info["llm_response"] = json.dumps({"obj_code": extracted})
+                else:
+                    # P1-2 fix: 提取失败 → 替换为合成 JSON + 哨兵值
+                    extract_failed = True
+                    full_info["llm_response"] = self._synthesize_llm_response()
+                    full_info["used_default_obj"] = True
+                    full_info["llm_status"] = "parse_error"
+                    full_info["llm_error"] = f"extract_code_hsIndiv returned empty for way={way}"
 
         # 3) 求解：使用 BCD 循环（Level 1+2a+2b）或降级至 Level 1
         bcd_enabled = getattr(self.config, 'use_bcd_loop', False)
@@ -407,6 +482,7 @@ class hsIndividualEdgeUav:
                     params=params,
                     traj_params=traj_params,
                     dynamic_obj_func=func,
+                    dynamic_traj_obj_func=traj_func,
                     initial_snapshot=initial_snapshot,
                     max_bcd_iter=getattr(self.config, 'bcd_max_iter', 5),
                     eps_bcd=getattr(self.config, 'bcd_eps', 1e-3),

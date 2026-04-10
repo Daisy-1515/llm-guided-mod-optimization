@@ -102,6 +102,7 @@ def solve_trajectory_sca(
     lambda_w: float = 1.0,
     N_act: int = 1,
     N_fly: int = 1,
+    dynamic_traj_obj_func: str | None = None,
 ) -> TrajectoryResult:
     """Solve the trajectory SCA subproblem with safety-aware solution screening."""
     _validate_input_basic(scenario, q_init, traj_params, params)
@@ -173,6 +174,7 @@ def solve_trajectory_sca(
                 lambda_w=lambda_w,
                 N_act=N_act,
                 N_fly=N_fly,
+                dynamic_traj_obj_func=dynamic_traj_obj_func,
             )
         except Exception as e:
             raise ValueError(f"SCA iteration {sca_k} failed to build subproblem: {e}")
@@ -706,6 +708,7 @@ def _build_sca_subproblem(
     lambda_w: float = 1.0,
     N_act: int = 1,
     N_fly: int = 1,
+    dynamic_traj_obj_func: str | None = None,
 ) -> tuple[cp.Problem, dict, dict, cp.Expression]:
     """围绕参照起点位 q_ref 来进行打桩和架置本趟回转的用以施行的 CVXPY SOCP 等效替代子命题方程组框架模型。
 
@@ -908,11 +911,33 @@ def _build_sca_subproblem(
 
     # Combined objective: alpha * comm_surrogate + lambda_w * propulsion + slack_penalty
     obj_slack = cp.sum(cp.hstack(objective_terms)) if objective_terms else 0.0
-    objective = cp.Minimize(
-        alpha * obj_comm_surrogate
-        + lambda_w * obj_propulsion
-        + obj_slack
-    )
+    if dynamic_traj_obj_func is not None:
+        try:
+            import math as _math
+            _ns: dict = {
+                "cp": cp, "math": _math,
+                "obj_comm_surrogate": obj_comm_surrogate,
+                "obj_propulsion": obj_propulsion,
+                "obj_slack": obj_slack,
+                "alpha": alpha, "lambda_w": lambda_w,
+                "N_act": N_act, "N_fly": N_fly,
+            }
+            exec(dynamic_traj_obj_func, {}, _ns)  # noqa: S102
+            _custom = _ns.get("dynamic_traj_objective")
+            if _custom is not None:
+                objective = cp.Minimize(_custom)
+            else:
+                print("[L2b-LLM] dynamic_traj_objective not assigned, using default")
+                objective = cp.Minimize(alpha * obj_comm_surrogate + lambda_w * obj_propulsion + obj_slack)
+        except Exception as _e:
+            print(f"[L2b-LLM] traj obj exec failed: {_e}, using default")
+            objective = cp.Minimize(alpha * obj_comm_surrogate + lambda_w * obj_propulsion + obj_slack)
+    else:
+        objective = cp.Minimize(
+            alpha * obj_comm_surrogate
+            + lambda_w * obj_propulsion
+            + obj_slack
+        )
 
     problem = cp.Problem(objective, constraints)
 

@@ -721,3 +721,72 @@ def test_velocity_constraint_ratio_diagnostic(
         f"ratio={ratio} != final_max_velocity / v_max = {max_vel / traj_params.v_max}"
     )
     assert 0.0 <= ratio <= 1.01, f"velocity_constraint_ratio {ratio} should be in [0, 1.01]"
+
+
+# ============================================================================
+# L2b LLM 动态目标函数测试 (T19-T21)
+# ============================================================================
+
+def test_dynamic_traj_obj_valid_code(
+    base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
+):
+    """T19: 有效的 dynamic_traj_obj_func 代码能正常运行，目标值仍为正。"""
+    scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+
+    traj_code = (
+        "import math\n"
+        "w_comm = math.exp(0.3) * alpha\n"
+        "dynamic_traj_objective = w_comm * obj_comm_surrogate + 0.5 * lambda_w * obj_propulsion + obj_slack\n"
+    )
+
+    result = solve_trajectory_sca(
+        scenario, {}, {}, q_init, params, traj_params,
+        max_sca_iter=3,
+        dynamic_traj_obj_func=traj_code,
+    )
+
+    assert result.sca_iterations >= 1
+    assert result.objective_value > 0
+    assert result.solver_status in ("optimal", "optimal_inaccurate")
+
+
+def test_dynamic_traj_obj_invalid_code_falls_back(
+    base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
+):
+    """T20: 无效的 dynamic_traj_obj_func 代码回退到默认目标，不崩溃。"""
+    scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+
+    bad_code = "this is not valid python !!!"
+
+    result = solve_trajectory_sca(
+        scenario, {}, {}, q_init, params, traj_params,
+        max_sca_iter=3,
+        dynamic_traj_obj_func=bad_code,
+    )
+
+    # 即使代码无效，应回退到默认目标并正常完成
+    assert result.sca_iterations >= 1
+    assert result.objective_value > 0
+
+
+def test_dynamic_traj_obj_none_uses_default(
+    base_scenario_1uav, params, traj_params, linear_init_trajectory_1uav
+):
+    """T21: dynamic_traj_obj_func=None 等价于原始默认行为（向后兼容）。"""
+    scenario = base_scenario_1uav
+    q_init = linear_init_trajectory_1uav
+
+    result_default = solve_trajectory_sca(
+        scenario, {}, {}, q_init, params, traj_params,
+        max_sca_iter=3, alpha=1.0, lambda_w=1.0,
+    )
+    result_none = solve_trajectory_sca(
+        scenario, {}, {}, q_init, params, traj_params,
+        max_sca_iter=3, alpha=1.0, lambda_w=1.0,
+        dynamic_traj_obj_func=None,
+    )
+
+    # 两者结果应完全相同
+    assert np.isclose(result_default.objective_value, result_none.objective_value, rtol=1e-9)

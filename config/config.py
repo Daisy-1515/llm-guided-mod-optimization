@@ -84,6 +84,7 @@ class configPara:
 
         # ---- Phase⑥ Step4 BCD 循环集成开关与参数 ----
         self.use_bcd_loop = False       # Phase⑥ Step4 Day 2: Level 1+2a+2b 集成开关（默认 False 保证向下兼容）
+        self.llm_layer = "L1"           # LLM 作用层：L1（任务分配目标）或 L2b（轨迹优化目标）
         self.bcd_max_iter = 5           # BCD 最大迭代数
         self.bcd_eps = 1e-3             # BCD 收敛容差（相对成本差）
         self.bcd_rollback_delta = 0.05  # BCD 成本回滚阈值（百分比，5%）
@@ -311,6 +312,7 @@ def dynamic_obj_func(self):
 
         # ---- Phase⑥ Step4 BCD 循环集成开关与参数 ----
         self.use_bcd_loop = self.get_config_value('edgeUavBCDIntegration', 'use_bcd_loop', self.use_bcd_loop, cast=bool)
+        self.llm_layer = self.get_config_value('edgeUavBCDIntegration', 'llm_layer', self.llm_layer)
         self.bcd_max_iter = self.get_config_value('edgeUavBCDIntegration', 'bcd_max_iter', self.bcd_max_iter, cast=int)
         self.bcd_eps = self.get_config_value('edgeUavBCDIntegration', 'bcd_eps', self.bcd_eps, cast=float)
         self.bcd_rollback_delta = self.get_config_value('edgeUavBCDIntegration', 'bcd_rollback_delta', self.bcd_rollback_delta, cast=float)

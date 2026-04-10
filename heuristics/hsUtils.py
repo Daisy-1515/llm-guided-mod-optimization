@@ -58,3 +58,12 @@ def extract_code_hsIndiv(response):
     """
     if "obj_code" in response:
         return response["obj_code"]
+
+
+@json_load
+def extract_traj_code_hsIndiv(response):
+    """
+    从 L2b LLM 响应中提取轨迹目标函数代码（traj_obj_code）。
+    """
+    if "traj_obj_code" in response:
+        return response["traj_obj_code"]
