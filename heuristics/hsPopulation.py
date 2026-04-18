@@ -74,7 +74,7 @@ class hsPopulation:
             futures = [executor.submit(fn, *args) for _ in range(self.popsize)]
             return [
                 future.result()
-                for future in as_completed(futures, timeout=self.timeout)
+                for future in as_completed(futures, timeout=None)
             ]
 
     def initialize_population(self):
@@ -98,10 +98,10 @@ class hsPopulation:
                     executor.submit(self.get_new_ind, pop, False)
                     for _ in range(self.popsize - 1)
                 ]
-                results = [elite_future.result(timeout=self.timeout)]
+                results = [elite_future.result(timeout=None)]
                 results += [
-                    f.result(timeout=self.timeout)
-                    for f in as_completed(normal_futures, timeout=self.timeout)
+                    f.result(timeout=None)
+                    for f in as_completed(normal_futures, timeout=None)
                 ]
             return results
         except Exception as e:
