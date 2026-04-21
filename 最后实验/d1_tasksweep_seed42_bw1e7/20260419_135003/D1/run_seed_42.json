@@ -1,0 +1,45 @@
+{
+  "schema_version": "experiment-run-v1",
+  "group": "D1",
+  "label": "default_objective",
+  "seed": 42,
+  "scenario": {
+    "numTasks": 10,
+    "numUAVs": 3,
+    "T": 80,
+    "use_bcd_loop": false
+  },
+  "search": {
+    "pop_size": 3,
+    "iterations": 3,
+    "eval_budget_target": 1,
+    "eval_budget_used": 1,
+    "llm_calls": 0
+  },
+  "wall_time_sec": 0.06362509727478027,
+  "source_run_dir": null,
+  "metrics": {
+    "best_cost": 189.07016125517637,
+    "mean_cost": 189.07016125517637,
+    "std_cost": 0.0,
+    "feasible_rate": 1.0,
+    "best_so_far": [
+      {
+        "evaluation_index": 1,
+        "best_cost": 189.07016125517637
+      }
+    ]
+  },
+  "history": [
+    {
+      "evaluation_index": 1,
+      "generation": 0,
+      "score": 189.07016125517637,
+      "feasible": true,
+      "llm_status": "default",
+      "used_default_obj": true,
+      "solver_cost": 73737.33032507509,
+      "response_format": "None Obj. Using default obj."
+    }
+  ]
+}

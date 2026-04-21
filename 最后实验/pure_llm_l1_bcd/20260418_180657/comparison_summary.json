@@ -1,0 +1,18 @@
+{
+  "B": {
+    "schema_version": "experiment-run-v1",
+    "group": "B",
+    "runs": 3,
+    "seeds": [
+      42,
+      43,
+      44
+    ],
+    "best_cost_mean": 257.17431040634193,
+    "best_cost_std": 39.66005377491239,
+    "best_cost_min": 212.75851955700827,
+    "feasible_rate_mean": 1.0,
+    "wall_time_mean_sec": 162.42925357818604,
+    "llm_layer": "L1"
+  }
+}

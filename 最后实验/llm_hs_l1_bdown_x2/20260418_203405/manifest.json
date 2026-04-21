@@ -1,0 +1,17 @@
+{
+  "schema_version": "experiment-run-v1",
+  "created_at": "20260418_203405",
+  "groups": [
+    "A"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "hs_pop_size": 10,
+  "hs_iterations": 5,
+  "use_bcd_loop": true,
+  "manual_alpha": null,
+  "manual_gamma": null
+}
