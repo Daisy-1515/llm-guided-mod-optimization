@@ -1,0 +1,9 @@
+{
+  "schema_version": "experiment-run-v1",
+  "group": "LOCAL",
+  "seed": 42,
+  "numTasks": 25,
+  "best_cost_mean": 399.7014039729414,
+  "best_cost_min": 399.7014039729414,
+  "feasible_rate_mean": 1.0
+}

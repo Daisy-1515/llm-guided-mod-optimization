@@ -1,0 +1,94 @@
+{
+  "results": [
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 5,
+      "best_cost_mean": 382.95274111381667,
+      "best_cost_min": 382.95274111381667,
+      "feasible_rate_mean": 1.0
+    },
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 10,
+      "best_cost_mean": 412.1748588211448,
+      "best_cost_min": 412.1748588211448,
+      "feasible_rate_mean": 1.0
+    },
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 15,
+      "best_cost_mean": 374.43329095729433,
+      "best_cost_min": 374.43329095729433,
+      "feasible_rate_mean": 1.0
+    },
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 20,
+      "best_cost_mean": 391.0320143459228,
+      "best_cost_min": 391.0320143459228,
+      "feasible_rate_mean": 1.0
+    },
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 25,
+      "best_cost_mean": 399.7014039729414,
+      "best_cost_min": 399.7014039729414,
+      "feasible_rate_mean": 1.0
+    },
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 30,
+      "best_cost_mean": 417.15051214854867,
+      "best_cost_min": 417.15051214854867,
+      "feasible_rate_mean": 1.0
+    },
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 35,
+      "best_cost_mean": 423.3593358481246,
+      "best_cost_min": 423.3593358481246,
+      "feasible_rate_mean": 1.0
+    },
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 40,
+      "best_cost_mean": 414.62256273792354,
+      "best_cost_min": 414.62256273792354,
+      "feasible_rate_mean": 1.0
+    },
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 45,
+      "best_cost_mean": 409.81582299943005,
+      "best_cost_min": 409.81582299943005,
+      "feasible_rate_mean": 1.0
+    },
+    {
+      "schema_version": "experiment-run-v1",
+      "group": "LOCAL",
+      "seed": 42,
+      "numTasks": 50,
+      "best_cost_mean": 421.08546745574637,
+      "best_cost_min": 421.08546745574637,
+      "feasible_rate_mean": 1.0
+    }
+  ]
+}

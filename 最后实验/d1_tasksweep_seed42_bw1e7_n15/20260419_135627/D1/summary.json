@@ -1,0 +1,13 @@
+{
+  "schema_version": "experiment-run-v1",
+  "group": "D1",
+  "runs": 1,
+  "seeds": [
+    42
+  ],
+  "best_cost_mean": 245.44212240481622,
+  "best_cost_std": 0.0,
+  "best_cost_min": 245.44212240481622,
+  "feasible_rate_mean": 1.0,
+  "wall_time_mean_sec": 0.09419703483581543
+}
