@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import statistics
 import sys
@@ -19,6 +20,9 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Arial Unicode MS", "DejaVu Sans"]
+plt.rcParams["axes.unicode_minus"] = False
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -40,7 +44,7 @@ METRIC_LABELS = {
     "wall_time_sec": "Wall Time (s)",
     "llm_calls": "LLM Calls",
 }
-SWEEP_MODES = {"ue-sweep-by-group", "ue-sweep-by-uavs"}
+SWEEP_MODES = {"ue-sweep-by-group", "ue-sweep-by-uavs", "comparison-json", "csv-ablation-bars"}
 
 
 # ─── 数据层：收敛图复用 ────────────────────────────────────────────────────────
@@ -604,10 +608,10 @@ def plot_experiment_seed_plotly(seed, group_data: dict, exp_dir: Path, output_pa
 
 # ─── sweep 图后端 ─────────────────────────────────────────────────────────────
 
-def plot_sweep_mpl(series_data, *, title: str, subtitle: str, y_label: str, output_path: Path, series_field: str):
+def plot_sweep_mpl(series_data, *, title: str, subtitle: str, x_label: str, y_label: str, output_path: Path, series_field: str):
     fig, ax = plt.subplots(figsize=(9, 5.5))
     fig.suptitle(f"{title}\n{subtitle}", fontsize=11)
-    ax.set_xlabel("UE Count")
+    ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     ax.set_title("Sweep Summary")
 
@@ -634,7 +638,7 @@ def plot_sweep_mpl(series_data, *, title: str, subtitle: str, y_label: str, outp
 
 
 
-def plot_sweep_plotly(series_data, *, title: str, subtitle: str, y_label: str, output_path: Path, series_field: str):
+def plot_sweep_plotly(series_data, *, title: str, subtitle: str, x_label: str, y_label: str, output_path: Path, series_field: str):
     try:
         import plotly.graph_objects as go
     except ImportError:
@@ -649,7 +653,12 @@ def plot_sweep_plotly(series_data, *, title: str, subtitle: str, y_label: str, o
         xs = [point["x"] for point in points]
         ys = [point["mean"] for point in points]
         customdata = [
-            [point["std"], point["n_runs"], ",".join(str(seed) for seed in point["seeds"]), ", ".join(point["exp_names"])]
+            [
+                point.get("std", 0.0),
+                point.get("n_runs", 1),
+                ",".join(str(seed) for seed in point.get("seeds", [])),
+                ", ".join(point.get("exp_names", [])),
+            ]
             for point in points
         ]
         color = _series_color(series_field, series["series_key"], index)
@@ -676,7 +685,7 @@ def plot_sweep_plotly(series_data, *, title: str, subtitle: str, y_label: str, o
         title_text=f"{title}<br><sup>{subtitle}</sup>",
         height=550,
         width=1000,
-        xaxis_title="UE Count",
+        xaxis_title=x_label,
         yaxis_title=y_label,
         legend=dict(orientation="v"),
     )
@@ -726,6 +735,131 @@ def run_convergence_mode(exp_dirs: list[Path], output_base: Path):
 
 
 
+
+
+def load_ablation_csv(csv_path: Path):
+    rows = []
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if not reader.fieldnames:
+            raise ValueError(f"csv is empty: {csv_path}")
+        required = {"numTasks", "all-local", "D1", "D1 feasible", "pure LLM(B)", "B feasible"}
+        missing = required - set(reader.fieldnames)
+        if missing:
+            missing_text = ", ".join(sorted(missing))
+            raise ValueError(f"csv missing columns: {missing_text}")
+        for row in reader:
+            rows.append(
+                {
+                    "x": int(float(row["numTasks"])),
+                    "all_local": float(row["all-local"]),
+                    "d1": float(row["D1"]),
+                    "d1_feasible": float(row["D1 feasible"]),
+                    "pure_llm": float(row["pure LLM(B)"]),
+                    "b_feasible": float(row["B feasible"]),
+                    "best_group": (row.get("最佳可行方案") or "").strip(),
+                }
+            )
+    if not rows:
+        raise ValueError(f"csv has no data rows: {csv_path}")
+    return rows
+
+
+def plot_ablation_bars_mpl(rows, *, title: str, x_label: str, y_label: str, output_path: Path):
+    fig, ax = plt.subplots(figsize=(10, 5.6))
+    x_positions = list(range(len(rows)))
+    width = 0.24
+
+    labels = [str(row["x"]) for row in rows]
+    all_local = [row["all_local"] for row in rows]
+    pure_llm = [row["pure_llm"] for row in rows]
+    d1 = [row["d1"] for row in rows]
+
+    ax.bar([x - width for x in x_positions], all_local, width=width, color="#FBC02D", edgecolor="black", linewidth=0.8, label="本地处理")
+    ax.bar(x_positions, pure_llm, width=width, color="#1F77B4", edgecolor="black", linewidth=0.8, label="RIS辅助卸载")
+    ax.bar([x + width for x in x_positions], d1, width=width, color="#E6550D", edgecolor="black", linewidth=0.8, label="失败")
+
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(labels)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 0.98), frameon=True, fancybox=False, edgecolor="black")
+    ax.tick_params(direction="in", top=True, right=True)
+    ax.set_axisbelow(True)
+    ax.set_ylim(bottom=0)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
+def run_comparison_json_mode(args, output_base: Path):
+    if not args.summary_json:
+        raise ValueError("comparison-json requires --summary-json")
+
+    summary_path = Path(args.summary_json)
+    if not summary_path.is_absolute():
+        summary_path = ROOT / summary_path
+    payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    title = payload.get("title", "Experiment Comparison")
+    subtitle = payload.get("subtitle", "")
+    x_label = payload.get("x_label", "UE Count")
+    y_label = payload.get("y_label", "Score")
+    series_data = payload.get("series", [])
+    if not series_data:
+        raise ValueError("summary json contains no series")
+
+    out_dir = output_base / "sweeps"
+    stem = summary_path.stem
+    png_path = out_dir / f"{stem}.png"
+    html_path = out_dir / f"{stem}.html"
+
+    plot_sweep_mpl(
+        series_data,
+        title=title,
+        subtitle=subtitle,
+        x_label=x_label,
+        y_label=y_label,
+        output_path=png_path,
+        series_field="group",
+    )
+    plot_sweep_plotly(
+        series_data,
+        title=title,
+        subtitle=subtitle,
+        x_label=x_label,
+        y_label=y_label,
+        output_path=html_path,
+        series_field="group",
+    )
+    print(f"\nDone: 1 PNG + 1 HTML  -> {out_dir}")
+    print(f"  png={png_path.name}")
+    print(f"  html={html_path.name}")
+    return 0
+
+
+def run_csv_ablation_bars_mode(args, output_base: Path):
+    if not args.csv_path:
+        raise ValueError("csv-ablation-bars requires --csv-path")
+
+    csv_path = Path(args.csv_path)
+    if not csv_path.is_absolute():
+        csv_path = ROOT / csv_path
+    rows = load_ablation_csv(csv_path)
+
+    out_dir = output_base / "csv_bars"
+    png_path = out_dir / f"{csv_path.stem}.png"
+    title = args.title or "消融实验对比"
+    x_label = args.x_label or "任务数"
+    y_label = args.y_label or "目标值"
+
+    plot_ablation_bars_mpl(rows, title=title, x_label=x_label, y_label=y_label, output_path=png_path)
+    print(f"\nDone: 1 PNG  -> {out_dir}")
+    print(f"  png={png_path.name}")
+    return 0
+
+
 def run_sweep_mode(args, exp_dirs: list[Path], output_base: Path):
     payloads = load_run_payloads(exp_dirs)
     records = [record for payload in payloads if (record := normalize_run_record(payload)) is not None]
@@ -773,6 +907,7 @@ def run_sweep_mode(args, exp_dirs: list[Path], output_base: Path):
         series_data,
         title=title,
         subtitle=subtitle,
+        x_label="UE Count",
         y_label=METRIC_LABELS.get(args.metric, args.metric),
         output_path=png_path,
         series_field=series_field,
@@ -781,6 +916,7 @@ def run_sweep_mode(args, exp_dirs: list[Path], output_base: Path):
         series_data,
         title=title,
         subtitle=subtitle,
+        x_label="UE Count",
         y_label=METRIC_LABELS.get(args.metric, args.metric),
         output_path=html_path,
         series_field=series_field,
@@ -845,12 +981,37 @@ def main():
         type=int,
         help="仅使用指定 seeds（可选）",
     )
+    parser.add_argument(
+        "--summary-json",
+        help="comparison-json 模式使用的汇总 JSON 文件",
+    )
+    parser.add_argument(
+        "--csv-path",
+        help="csv-ablation-bars 模式使用的 CSV 文件",
+    )
+    parser.add_argument(
+        "--title",
+        help="自定义图标题",
+    )
+    parser.add_argument(
+        "--x-label",
+        help="自定义横轴标题",
+    )
+    parser.add_argument(
+        "--y-label",
+        help="自定义纵轴标题",
+    )
     args = parser.parse_args()
 
     base_dir = ROOT / "discussion" / "experiment_results"
     output_base = ROOT / args.output_dir
 
     try:
+        if args.mode == "comparison-json":
+            return run_comparison_json_mode(args, output_base)
+        if args.mode == "csv-ablation-bars":
+            return run_csv_ablation_bars_mode(args, output_base)
+
         exp_dirs = resolve_experiment_dirs(args.exp_dir, base_dir)
     except FileNotFoundError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
