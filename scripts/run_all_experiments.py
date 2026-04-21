@@ -57,6 +57,11 @@ class ScenarioBundle:
 def parse_args():
     parser = argparse.ArgumentParser(description="Run the Edge-UAV experiment suite.")
     parser.add_argument(
+        "--config",
+        default=None,
+        help="Optional config file path. Defaults to config/setting.cfg.",
+    )
+    parser.add_argument(
         "--groups",
         nargs="+",
         default=list(DEFAULT_GROUPS),
@@ -73,6 +78,48 @@ def parse_args():
         "--output-root",
         default="discussion/experiment_results",
         help="Directory used to store experiment outputs.",
+    )
+    parser.add_argument(
+        "--num-tasks",
+        type=int,
+        default=None,
+        help="Override scenario numTasks.",
+    )
+    parser.add_argument(
+        "--num-uavs",
+        type=int,
+        default=None,
+        help="Override scenario numUAVs.",
+    )
+    parser.add_argument(
+        "--b-up",
+        type=float,
+        default=None,
+        help="Override uplink bandwidth B_up (Hz).",
+    )
+    parser.add_argument(
+        "--b-down",
+        type=float,
+        default=None,
+        help="Override downlink bandwidth B_down (Hz).",
+    )
+    parser.add_argument(
+        "--tau",
+        type=float,
+        default=None,
+        help="Override both tau_min and tau_max.",
+    )
+    parser.add_argument(
+        "--tau-min",
+        type=float,
+        default=None,
+        help="Override task tau_min (s).",
+    )
+    parser.add_argument(
+        "--tau-max",
+        type=float,
+        default=None,
+        help="Override task tau_max (s).",
     )
     parser.add_argument(
         "--manual-alpha",
@@ -112,12 +159,26 @@ def parse_args():
 
 
 def make_params(args):
-    params = load_config()
+    params = load_config(args.config)
+    tau_min = args.tau if args.tau is not None else args.tau_min
+    tau_max = args.tau if args.tau is not None else args.tau_max
     apply_config_overrides(
         params,
         pop_size=args.hs_pop_size,
         iteration=args.hs_iterations,
         use_bcd_loop=not args.no_bcd_loop,
+        extra={
+            key: value
+            for key, value in {
+                "numTasks": args.num_tasks,
+                "numUAVs": args.num_uavs,
+                "B_up": args.b_up,
+                "B_down": args.b_down,
+                "tau_min": tau_min,
+                "tau_max": tau_max,
+            }.items()
+            if value is not None
+        },
     )
     return params
 
@@ -198,7 +259,7 @@ def summarize_history(history):
 
 
 def run_group_a(bundle):
-    solver = make_edge_uav_solver(bundle.params, bundle.scenario)
+    solver = make_edge_uav_solver(bundle.params, bundle.scenario, timeout=None)
     started = time.time()
     solver.run()
     wall_time_sec = time.time() - started
@@ -408,6 +469,8 @@ def build_run_payload(result, seed, bundle):
         "scenario": {
             "numTasks": bundle.params.numTasks,
             "numUAVs": bundle.params.numUAVs,
+            "tau_min": bundle.params.tau_min,
+            "tau_max": bundle.params.tau_max,
             "T": bundle.params.T,
             "use_bcd_loop": bool(bundle.params.use_bcd_loop),
         },
@@ -492,6 +555,10 @@ def main():
                     "groups": groups,
                     "seeds": args.seeds,
                     "output_root": str(output_root),
+                    "num_tasks": base_params.numTasks,
+                    "num_uavs": base_params.numUAVs,
+                    "tau_min": base_params.tau_min,
+                    "tau_max": base_params.tau_max,
                     "hs_pop_size": base_params.popSize,
                     "hs_iterations": base_params.iteration,
                     "use_bcd_loop": bool(base_params.use_bcd_loop),
@@ -506,6 +573,10 @@ def main():
         "created_at": timestamp,
         "groups": groups,
         "seeds": args.seeds,
+        "num_tasks": base_params.numTasks,
+        "num_uavs": base_params.numUAVs,
+        "tau_min": base_params.tau_min,
+        "tau_max": base_params.tau_max,
         "hs_pop_size": base_params.popSize,
         "hs_iterations": base_params.iteration,
         "use_bcd_loop": bool(base_params.use_bcd_loop),
