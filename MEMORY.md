@@ -2,36 +2,35 @@
 
 ## 当前进度
 
-**更新时间**: 2026-04-06
+**更新时间**: 2026-04-21 20:35 CST
 
 ### 已完成
 
-- [x] 文档整理：INDEX同步 + 文件重命名 + archive完善
-- [x] 聚合归一化代码实现（evaluator.py, precompute.py, objectives.py, trajectory_opt.py）
-- [x] SCA 求解器修复：Gurobi solver fallback + F_max 参数调整
-- [x] BCD cost rollback 联合目标修复（cost_ra + cost_traj）
-- [x] 贪心轨迹初始化 Bug 修复（起点丢失 + tie-breaking）
-- [x] 3 个 pre-existing 测试全部修复（154/154 tests pass）
-- [x] HS 替代 Layer1 求解器可行性分析文档（文档/60_规划草案/）
+- [x] 最终实验文档整理：手册统一收拢到 `文档/30_测试与执行/最终实验手册/`
+- [x] 新增 `文档/30_测试与执行/最终实验现状总览_2026-04-21.md`，按真实目录核对 `最后实验/` 的完成情况
+- [x] 无人机数量消融实验结果统一归档到 `最后实验/横坐标无人机 消融实验/`
+- [x] 填充 `最后实验/横坐标无人机 消融实验/横坐标无人机数量 消融实验.csv`
+- [x] 任务数参考表归档到 `最后实验/横坐标任务数 消融实验.csv`
+- [x] 为无人机消融目录补充 `README.md`，写明 `u=3~9` 覆盖范围与重复点位选取规则
 
 ### 当前参数配置
 
-- F_max = 2e8 Hz
-- B_up / B_down = 2e7 Hz
-- tau = 0.5s
-- alpha = 35, lambda_w = 1
+- A 组无人机消融结果口径：`seed=42`，`numTasks=20`，`numUAVs=3~9`
+- A 组带宽参数：`B_up = 5e7`，`B_down = 5e7`
+- A 组求解设置：`use_bcd_loop = true`，`hs popSize = 3`，`hs iteration = 3`
+- 待补 D1 口径：`B_up = 1e7`，`B_down = 1e7`，`use_bcd_loop = false`
 
 ### 待验证
 
-- [ ] offloading_outputs 是否正确保存到 JSON（run_all_experiments.py）
-- [ ] BCD 多轮迭代效果验证（确认 L1 整数决策是否翻转）
-- [ ] F_max=2e8 + B=2e7 "甜区"参数下轨迹分化 + 卸载并存
+- [ ] 在具备完整 Gurobi 授权的机器上补跑 D1 无 BCD 的无人机数量 sweep（`u=3~9`，`B_up=B_down=1e7`）
+- [ ] 为无人机消融补齐 D1 结果后，更新对比 CSV / 出图
+- [ ] 确认是否需要把 `u=3`、`u=6` 的重复 A 组结果进一步人工定版
 
 ## 下次开始建议
 
-1. **验证 offloading_outputs 保存**：检查 `run_all_experiments.py` 中 `offloading_outputs` 是否写入 JSON，用 F_max=2e8 + B=2e7 参数跑一次完整实验
-2. **BCD 多轮迭代验证**：观察多次 BCD 迭代中 L1 决策是否翻转（检查 `bcd_iterations` 字段）
-3. **HS-L1 原型实现**（可选）：参考 `文档/60_规划草案/HS替代Layer1求解器_可行性分析_2026-04-06.md`，从"编码空间强制可行性"方案开始
+1. **在授权机器上跑 D1 无人机 sweep**：直接执行已整理好的 `D1` 命令，参数固定为 `numTasks=20`、`tau=1.0`、`B_up=B_down=1e7`、`--no-bcd-loop`
+2. **回填无人机对比表**：补完 D1 后，把 `最后实验/横坐标无人机 消融实验/横坐标无人机数量 消融实验.csv` 扩展为正式对比表
+3. **统一出图**：基于任务数 / 无人机数量两张 CSV 生成最终图，避免继续依赖分散目录人工读数
 
 ## 技术备忘
 
