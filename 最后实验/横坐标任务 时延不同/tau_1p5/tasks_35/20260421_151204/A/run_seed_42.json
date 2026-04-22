@@ -1,0 +1,243 @@
+{
+  "schema_version": "experiment-run-v1",
+  "group": "A",
+  "label": "llm_hs",
+  "seed": 42,
+  "scenario": {
+    "numTasks": 35,
+    "numUAVs": 8,
+    "tau_min": 1.5,
+    "tau_max": 1.5,
+    "T": 80,
+    "use_bcd_loop": true
+  },
+  "search": {
+    "pop_size": 3,
+    "iterations": 3,
+    "eval_budget_target": 9,
+    "eval_budget_used": 9,
+    "llm_calls": 9
+  },
+  "wall_time_sec": 2147.7040073871613,
+  "source_run_dir": "discussion\\20260421_151204",
+  "metrics": {
+    "best_cost": 85.34106125180898,
+    "mean_cost": 123.12253970799767,
+    "std_cost": 60.69544144497095,
+    "feasible_rate": 0.7777777777777778,
+    "best_so_far": [
+      {
+        "evaluation_index": 1,
+        "best_cost": 85.34106125180898
+      },
+      {
+        "evaluation_index": 2,
+        "best_cost": 85.34106125180898
+      },
+      {
+        "evaluation_index": 3,
+        "best_cost": 85.34106125180898
+      },
+      {
+        "evaluation_index": 4,
+        "best_cost": 85.34106125180898
+      },
+      {
+        "evaluation_index": 5,
+        "best_cost": 85.34106125180898
+      },
+      {
+        "evaluation_index": 6,
+        "best_cost": 85.34106125180898
+      },
+      {
+        "evaluation_index": 7,
+        "best_cost": 85.34106125180898
+      },
+      {
+        "evaluation_index": 8,
+        "best_cost": 85.34106125180898
+      },
+      {
+        "evaluation_index": 9,
+        "best_cost": 85.34106125180898
+      }
+    ]
+  },
+  "history": [
+    {
+      "evaluation_index": 1,
+      "generation": 0,
+      "score": 85.34106125180898,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 8.35774648495888,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          8.35774648495888,
+          8.360419097131063
+        ]
+      }
+    },
+    {
+      "evaluation_index": 2,
+      "generation": 0,
+      "score": 131.1158261119098,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 5.535881967127435,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 3,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          5.535881967127435,
+          5.762438465211737,
+          5.762438465211737
+        ]
+      }
+    },
+    {
+      "evaluation_index": 3,
+      "generation": 0,
+      "score": 91.39535367201495,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.9456946033149425,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 4,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          7.9456946033149425,
+          8.312334156535506,
+          8.133057487021885,
+          8.138675885005453
+        ]
+      }
+    },
+    {
+      "evaluation_index": 4,
+      "generation": 1,
+      "score": 90.36500311340644,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.826579875863006,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          7.826579875863006,
+          7.826582507085852
+        ]
+      }
+    },
+    {
+      "evaluation_index": 5,
+      "generation": 1,
+      "score": 88.81801185537869,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 8.320901760539005,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 3,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          8.320901760539005,
+          8.331784662336636,
+          8.337182435105277
+        ]
+      }
+    },
+    {
+      "evaluation_index": 6,
+      "generation": 1,
+      "score": 91.64110562357943,
+      "feasible": false,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.928144930953618,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 1,
+        "bcd_converged": false,
+        "bcd_cost_history": [
+          7.928144930953618
+        ]
+      }
+    },
+    {
+      "evaluation_index": 7,
+      "generation": 2,
+      "score": 282.21051094723884,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 5.8660610777805506e-05,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          5.8660610777805506e-05,
+          5.8660610777805506e-05
+        ]
+      }
+    },
+    {
+      "evaluation_index": 8,
+      "generation": 2,
+      "score": 156.06635792688252,
+      "feasible": false,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 4.218903140995356,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 1,
+        "bcd_converged": false,
+        "bcd_cost_history": [
+          4.218903140995356
+        ]
+      }
+    },
+    {
+      "evaluation_index": 9,
+      "generation": 2,
+      "score": 91.14962686975942,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 8.371663912613354,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 3,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          8.371663912613354,
+          8.381225567829052,
+          8.381263324358804
+        ]
+      }
+    }
+  ]
+}

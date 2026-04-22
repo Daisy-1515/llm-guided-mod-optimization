@@ -1,0 +1,236 @@
+{
+  "schema_version": "experiment-run-v1",
+  "group": "A",
+  "label": "llm_hs",
+  "seed": 42,
+  "scenario": {
+    "numTasks": 5,
+    "numUAVs": 8,
+    "tau_min": 1.5,
+    "tau_max": 1.5,
+    "T": 80,
+    "use_bcd_loop": true
+  },
+  "search": {
+    "pop_size": 3,
+    "iterations": 3,
+    "eval_budget_target": 9,
+    "eval_budget_used": 9,
+    "llm_calls": 9
+  },
+  "wall_time_sec": 694.5871844291687,
+  "source_run_dir": "discussion\\20260421_142511",
+  "metrics": {
+    "best_cost": 8.512606319086448,
+    "mean_cost": 10.745281947867689,
+    "std_cost": 5.792613689183887,
+    "feasible_rate": 0.7777777777777778,
+    "best_so_far": [
+      {
+        "evaluation_index": 1,
+        "best_cost": 27.124511346522542
+      },
+      {
+        "evaluation_index": 2,
+        "best_cost": 8.984759423698744
+      },
+      {
+        "evaluation_index": 3,
+        "best_cost": 8.590990272837082
+      },
+      {
+        "evaluation_index": 4,
+        "best_cost": 8.590990272837082
+      },
+      {
+        "evaluation_index": 5,
+        "best_cost": 8.590990272837082
+      },
+      {
+        "evaluation_index": 6,
+        "best_cost": 8.590990272837082
+      },
+      {
+        "evaluation_index": 7,
+        "best_cost": 8.590990272837082
+      },
+      {
+        "evaluation_index": 8,
+        "best_cost": 8.53135579520034
+      },
+      {
+        "evaluation_index": 9,
+        "best_cost": 8.512606319086448
+      }
+    ]
+  },
+  "history": [
+    {
+      "evaluation_index": 1,
+      "generation": 0,
+      "score": 27.124511346522542,
+      "feasible": false,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": Infinity,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 0,
+        "bcd_converged": false,
+        "bcd_cost_history": []
+      }
+    },
+    {
+      "evaluation_index": 2,
+      "generation": 0,
+      "score": 8.984759423698744,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 8.04824410845821,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          8.04824410845821,
+          8.04824492091334
+        ]
+      }
+    },
+    {
+      "evaluation_index": 3,
+      "generation": 0,
+      "score": 8.590990272837082,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.955462307128572,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          7.955462307128572,
+          7.955498359908663
+        ]
+      }
+    },
+    {
+      "evaluation_index": 4,
+      "generation": 1,
+      "score": 8.772730983477924,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.979765045688252,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          7.9797946523238625,
+          7.979765045688252
+        ]
+      }
+    },
+    {
+      "evaluation_index": 5,
+      "generation": 1,
+      "score": 8.772632208455637,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.979639586900598,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          7.9797946523238625,
+          7.979639586900598
+        ]
+      }
+    },
+    {
+      "evaluation_index": 6,
+      "generation": 1,
+      "score": 8.64536992346267,
+      "feasible": false,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.961400829113244,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 1,
+        "bcd_converged": false,
+        "bcd_cost_history": [
+          7.961400829113244
+        ]
+      }
+    },
+    {
+      "evaluation_index": 7,
+      "generation": 2,
+      "score": 8.772581258067813,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.97955182983028,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          7.979695384747188,
+          7.97955182983028
+        ]
+      }
+    },
+    {
+      "evaluation_index": 8,
+      "generation": 2,
+      "score": 8.53135579520034,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.936278617900317,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          7.936278617900317,
+          7.936320072023408
+        ]
+      }
+    },
+    {
+      "evaluation_index": 9,
+      "generation": 2,
+      "score": 8.512606319086448,
+      "feasible": true,
+      "llm_status": "ok",
+      "used_default_obj": false,
+      "solver_cost": 7.92836282434521,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj.",
+      "bcd_enabled": true,
+      "bcd_meta": {
+        "bcd_iterations": 2,
+        "bcd_converged": true,
+        "bcd_cost_history": [
+          7.928406599389463,
+          7.92836282434521
+        ]
+      }
+    }
+  ]
+}

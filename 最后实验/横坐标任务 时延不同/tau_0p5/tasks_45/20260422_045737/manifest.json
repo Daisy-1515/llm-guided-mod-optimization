@@ -1,0 +1,19 @@
+{
+  "schema_version": "experiment-run-v1",
+  "created_at": "20260422_045737",
+  "groups": [
+    "A"
+  ],
+  "seeds": [
+    42
+  ],
+  "num_tasks": 45,
+  "num_uavs": 8,
+  "tau_min": 0.5,
+  "tau_max": 0.5,
+  "hs_pop_size": 3,
+  "hs_iterations": 3,
+  "use_bcd_loop": true,
+  "manual_alpha": null,
+  "manual_gamma": null
+}
