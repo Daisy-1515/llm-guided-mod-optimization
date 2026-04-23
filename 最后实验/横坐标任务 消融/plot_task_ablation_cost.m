@@ -12,10 +12,10 @@ T = readtable(filePath, 'VariableNamingRule', 'preserve');
 x = T.("numTasks");
 
 % 纵坐标：仅使用综合成本
-y1 = T.("all-local");
-y2 = T.("D1");
-y3 = T.("pure LLM(B)");
-y4 = T.("A(bup=1e7,bdown=5e7)");
+y1 = T.("本地执行");
+y2 = T.("标准目标函数");
+y3 = T.("LLM");
+y4 = T.("LLM+HS");
 
 % 创建画布
 figure('Color', 'w', 'Position', [200, 120, 860, 620]);
@@ -54,15 +54,26 @@ xlim([min(x), max(x)]);
 ymax = max([y1; y2; y3; y4]);
 ylim([0, ceil(ymax / 50) * 50 + 50]);
 
-xlabel('任务数', 'FontName', 'SimSun', 'FontSize', 22);
+xlabel('TD 数量', 'FontName', 'SimSun', 'FontSize', 22);
 ylabel('综合成本', 'FontName', 'SimSun', 'FontSize', 22);
 
 % 图例
-legend({'all-local', 'D1', 'pure LLM(B)', 'A(bup=1e7,bdown=5e7)'}, ...
-    'Location', 'northwest', ...
+legend({'本地执行', '标准目标函数', 'LLM', 'LLM+HS'}, ...
+    'Location', 'southeast', ...
     'FontName', 'Times New Roman', ...
     'FontSize', 16, ...
     'Box', 'on');
+
+% legend({'all-local', 'D1', 'pure LLM(B)', 'A(bup=1e7,bdown=5e7)'}, ...
+%     'Location', 'northwest', ...
+%     'FontName', 'Times New Roman', ...
+%     'FontSize', 16, ...
+%     'Box', 'on');
+
+
+
+
+
 
 % 保持与参考图接近的简洁风格
 grid off;
