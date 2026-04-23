@@ -1,0 +1,47 @@
+{
+  "schema_version": "experiment-run-v1",
+  "group": "LOCAL",
+  "label": "all_local",
+  "seed": 42,
+  "scenario": {
+    "numTasks": 20,
+    "numUAVs": 3,
+    "tau_min": 1.0,
+    "tau_max": 1.0,
+    "T": 80,
+    "use_bcd_loop": false
+  },
+  "search": {
+    "pop_size": 3,
+    "iterations": 3,
+    "eval_budget_target": 1,
+    "eval_budget_used": 1,
+    "llm_calls": 0
+  },
+  "wall_time_sec": 0.08751201629638672,
+  "source_run_dir": null,
+  "metrics": {
+    "best_cost": 391.00080389091096,
+    "mean_cost": 391.00080389091096,
+    "std_cost": 0.0,
+    "feasible_rate": 1.0,
+    "best_so_far": [
+      {
+        "evaluation_index": 1,
+        "best_cost": 391.00080389091096
+      }
+    ]
+  },
+  "history": [
+    {
+      "evaluation_index": 1,
+      "generation": 0,
+      "score": 391.00080389091096,
+      "feasible": true,
+      "llm_status": "local_only",
+      "used_default_obj": true,
+      "solver_cost": 391.00080389091096,
+      "response_format": "All tasks forced to local execution."
+    }
+  ]
+}

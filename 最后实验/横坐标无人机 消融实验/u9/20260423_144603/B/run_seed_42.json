@@ -1,0 +1,47 @@
+{
+  "schema_version": "experiment-run-v1",
+  "group": "B",
+  "label": "llm_only",
+  "seed": 42,
+  "scenario": {
+    "numTasks": 20,
+    "numUAVs": 9,
+    "tau_min": 1.0,
+    "tau_max": 1.0,
+    "T": 80,
+    "use_bcd_loop": true
+  },
+  "search": {
+    "pop_size": 3,
+    "iterations": 3,
+    "eval_budget_target": 1,
+    "eval_budget_used": 1,
+    "llm_calls": 1
+  },
+  "wall_time_sec": 307.41963481903076,
+  "source_run_dir": null,
+  "metrics": {
+    "best_cost": 139.8180178164443,
+    "mean_cost": 139.8180178164443,
+    "std_cost": 0.0,
+    "feasible_rate": 0.0,
+    "best_so_far": [
+      {
+        "evaluation_index": 1,
+        "best_cost": 139.8180178164443
+      }
+    ]
+  },
+  "history": [
+    {
+      "evaluation_index": 1,
+      "generation": 0,
+      "score": 139.8180178164443,
+      "feasible": false,
+      "llm_status": "api_error",
+      "used_default_obj": false,
+      "solver_cost": 16.85079347975696,
+      "response_format": "Your obj function is correct. Gurobi accepts your obj."
+    }
+  ]
+}
