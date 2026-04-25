@@ -108,6 +108,12 @@ uv run python scripts/run_all_experiments.py --groups A D1 --seeds 42 --no-bcd-l
   - 用途：检查 LLM 端到端连通性
   - 命令：`uv run python scripts/check_llm_api.py`
 
+- `docx_to_md.py`
+  - 用途：将 Word `.docx` 文档稳定转换为 Markdown（依赖本机 `pandoc`）
+  - 命令：
+    - `uv run python scripts/docx_to_md.py --input path/to/file.docx`
+    - `uv run python scripts/docx_to_md.py --input path/to/file.docx --output path/to/file.md`
+
 - `diagnose_edge_uav_bcd.py`
   - 用途：批量诊断场景可行性与 BCD 改善
   - 命令：`uv run python scripts/diagnose_edge_uav_bcd.py --seeds 42`
@@ -143,4 +149,3 @@ uv run python scripts/run_all_experiments.py --groups A D1 --seeds 42 --no-bcd-l
 
 - `no optimal_snapshot.q found`
   - 轨迹图脚本需要 BCD 快照；请确认实验是 BCD 路径并且结果里有 `bcd_meta.optimal_snapshot`。
-
