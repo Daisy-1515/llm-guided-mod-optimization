@@ -2,9 +2,9 @@ clc; clear; close all;
 
 % 近似数据（按图片估计）
 groups = {'本文提出的LLM辅助优化算法', '未优化'};
-local_process = [15, 95];      % 本地处理
-ris_offload   = [820, 695];    % LLM辅助卸载
-failed        = [165, 210];    % 失败
+local_process = [13, 81];      % 本地处理
+ris_offload   = [797, 694];    % LLM辅助卸载
+failed        = [61, 96];    % 失败
 
 % 组位置
 x = 1:2;

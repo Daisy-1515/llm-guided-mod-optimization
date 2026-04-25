@@ -55,7 +55,7 @@ allY = [y1; y2; y3; y4; y5];
 allY = allY(~isnan(allY));
 ylim([0, ceil(max(allY) / 50) * 50 + 50]);
 
-xlabel(char([84 68 32 25968 37327]), 'FontName', 'SimSun', 'FontSize', 22);
+xlabel(char([84 68 32 25968 37327]), 'FontName', 'Times New Roman', 'FontSize', 22);
 ylabel(char([32508 21512 25104 26412]), 'FontName', 'SimSun', 'FontSize', 22);
 
 legend({ ...
