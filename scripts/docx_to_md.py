@@ -11,11 +11,11 @@ import argparse
 import logging
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 
 LOGGER = logging.getLogger("docx_to_md")
+MARKDOWN_TARGET = "markdown+tex_math_dollars+pipe_tables+raw_html"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -44,6 +44,10 @@ def resolve_output_path(input_path: Path, output_arg: str | None) -> Path:
     return input_path.with_suffix(".md")
 
 
+def resolve_media_dir(output_path: Path) -> Path:
+    return output_path.parent / f"{output_path.stem}_media"
+
+
 def require_pandoc() -> str:
     pandoc = shutil.which("pandoc")
     if pandoc:
@@ -64,16 +68,47 @@ def validate_input_path(input_arg: str) -> Path:
     return input_path
 
 
-def run_pandoc(pandoc: str, input_path: Path, output_path: Path) -> None:
+def build_pandoc_command(
+    pandoc: str,
+    input_path: Path,
+    output_path: Path,
+    media_dir: Path,
+) -> list[str]:
+    return [
+        pandoc,
+        str(input_path),
+        "-t",
+        MARKDOWN_TARGET,
+        "--wrap=none",
+        f"--extract-media={media_dir.name}",
+        "-o",
+        output_path.name,
+    ]
+
+
+def _stderr_has_only_warnings(stderr: str) -> bool:
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    return bool(lines) and all(line.startswith("[WARNING]") for line in lines)
+
+
+def run_pandoc(pandoc: str, input_path: Path, output_path: Path) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    media_dir = resolve_media_dir(output_path)
     result = subprocess.run(
-        [pandoc, str(input_path), "-t", "gfm", "-o", str(output_path)],
+        build_pandoc_command(pandoc, input_path, output_path, media_dir),
+        cwd=output_path.parent,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
         stderr = result.stderr.strip() or "pandoc failed without stderr output"
+        if output_path.exists() and _stderr_has_only_warnings(stderr):
+            LOGGER.warning("pandoc emitted warnings during conversion:\n%s", stderr)
+            return media_dir
         raise RuntimeError(f"pandoc conversion failed: {stderr}")
+    if result.stderr.strip():
+        LOGGER.warning("pandoc emitted warnings during conversion:\n%s", result.stderr.strip())
+    return media_dir
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -85,12 +120,13 @@ def main(argv: list[str] | None = None) -> int:
         input_path = validate_input_path(args.input)
         output_path = resolve_output_path(input_path, args.output)
         pandoc = require_pandoc()
-        run_pandoc(pandoc, input_path, output_path)
+        media_dir = run_pandoc(pandoc, input_path, output_path)
     except Exception as exc:
         LOGGER.error("%s", exc)
         return 1
 
     LOGGER.info("Converted %s -> %s", input_path, output_path)
+    LOGGER.info("Extracted media to %s", media_dir)
     return 0
 
 

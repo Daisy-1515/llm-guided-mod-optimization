@@ -2,8 +2,11 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+
+from scripts import docx_to_md
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,4 +70,51 @@ def test_docx_to_md_respects_explicit_output_path(tmp_path: Path):
     result = _run_cli("--input", str(source_docx), "--output", str(output_md))
 
     assert result.returncode == 0, result.stderr
+    assert output_md.exists()
+
+
+def test_resolve_media_dir_places_assets_next_to_output():
+    output_md = Path("nested") / "paper.md"
+
+    media_dir = docx_to_md.resolve_media_dir(output_md)
+
+    assert media_dir == Path("nested") / "paper_media"
+
+
+def test_build_pandoc_command_uses_relative_output_and_media_paths(tmp_path: Path):
+    source_docx = tmp_path / "input.docx"
+    output_md = tmp_path / "nested" / "result.md"
+    media_dir = docx_to_md.resolve_media_dir(output_md)
+
+    command = docx_to_md.build_pandoc_command(
+        "pandoc",
+        source_docx,
+        output_md,
+        media_dir,
+    )
+
+    assert command[:4] == ["pandoc", str(source_docx), "-t", docx_to_md.MARKDOWN_TARGET]
+    assert "--wrap=none" in command
+    assert f"--extract-media={media_dir.name}" in command
+    assert command[-2:] == ["-o", output_md.name]
+
+
+def test_run_pandoc_tolerates_warning_only_stderr_when_output_exists(tmp_path: Path):
+    source_docx = tmp_path / "input.docx"
+    output_md = tmp_path / "result.md"
+    source_docx.write_bytes(b"placeholder")
+
+    def _fake_run(*args, **kwargs):
+        output_md.write_text("# converted\n", encoding="utf-8")
+        return subprocess.CompletedProcess(
+            args[0],
+            1,
+            "",
+            "[WARNING] Could not convert TeX math x^2, rendering as TeX",
+        )
+
+    with patch("scripts.docx_to_md.subprocess.run", side_effect=_fake_run):
+        media_dir = docx_to_md.run_pandoc("pandoc", source_docx, output_md)
+
+    assert media_dir == output_md.parent / "result_media"
     assert output_md.exists()
