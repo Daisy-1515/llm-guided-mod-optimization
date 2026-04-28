@@ -1,27 +1,22 @@
 clc; clear; close all;
 
-% 在脚本所在目录定位 CSV，便于在项目中直接复现实验图，
-% 避免使用硬编码的绝对路径。
+% Rebuild the task-count ablation figure using the finalized algorithm labels.
 scriptDir = fileparts(mfilename('fullpath'));
-filePath = fullfile(scriptDir, '横坐标任务数 消融实验.csv');
+fileName = char([27178 22352 26631 20219 21153 25968 32 28040 34701 23454 39564 46 99 115 118]);
+filePath = fullfile(scriptDir, fileName);
+assert(isfile(filePath), 'Expected CSV file is missing: %s', filePath);
 
-% 读取数据，并保留 CSV 中的原始列名。
 T = readtable(filePath, 'VariableNamingRule', 'preserve');
 
-% 横坐标：任务数
-x = T.("numTasks");
+x = T{:, 1};
+y1 = T{:, 2};
+y2 = T{:, 3};
+y3 = T{:, 4};
+y4 = T{:, 5};
 
-% 纵坐标：仅使用综合成本
-y1 = T.("本地执行");
-y2 = T.("标准目标函数");
-y3 = T.("LLM");
-y4 = T.("LLM+HS");
-
-% 创建画布
 figure('Color', 'w', 'Position', [200, 120, 860, 620]);
 hold on; box on;
 
-% 按照参考图风格绘制曲线
 plot(x, y1, '-o', ...
     'Color', 'r', 'LineWidth', 2.0, ...
     'MarkerSize', 10, 'MarkerFaceColor', 'none', 'MarkerEdgeColor', 'r');
@@ -38,7 +33,6 @@ plot(x, y4, '-d', ...
     'Color', 'm', 'LineWidth', 2.0, ...
     'MarkerSize', 10, 'MarkerFaceColor', 'none', 'MarkerEdgeColor', 'm');
 
-% 坐标轴样式
 ax = gca;
 ax.FontName = 'Times New Roman';
 ax.FontSize = 18;
@@ -54,29 +48,16 @@ xlim([min(x), max(x)]);
 ymax = max([y1; y2; y3; y4]);
 ylim([0, ceil(ymax / 50) * 50 + 50]);
 
-xlabel('TD 数量', 'FontName', 'SimSun', 'FontSize', 22);
-ylabel('综合成本', 'FontName', 'SimSun', 'FontSize', 22);
+xlabel(char([84 68 32 25968 37327]), 'FontName', 'SimSun', 'FontSize', 22);
+ylabel(char([32508 21512 25104 26412]), 'FontName', 'SimSun', 'FontSize', 22);
 
-% 图例
-legend({'本地执行', '标准目标函数', 'LLM', 'LLM+HS'}, ...
+legend({'ALA', 'Default Objective', 'LOGO', 'LLM+HS'}, ...
     'Location', 'southeast', ...
     'FontName', 'Times New Roman', ...
     'FontSize', 16, ...
     'Box', 'on');
 
-% legend({'all-local', 'D1', 'pure LLM(B)', 'A(bup=1e7,bdown=5e7)'}, ...
-%     'Location', 'northwest', ...
-%     'FontName', 'Times New Roman', ...
-%     'FontSize', 16, ...
-%     'Box', 'on');
-
-
-
-
-
-
-% 保持与参考图接近的简洁风格
 grid off;
 
-% 可选：导出高分辨率图片
+% Optional export for publication-quality figures.
 % print(gcf, fullfile(scriptDir, 'task_count_ablation_cost.png'), '-dpng', '-r600');

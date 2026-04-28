@@ -1,5 +1,6 @@
 clc; clear; close all;
 
+% Compare LLM+HS under different bandwidth settings.
 scriptDir = fileparts(mfilename('fullpath'));
 csvFiles = dir(fullfile(scriptDir, '*.csv'));
 assert(~isempty(csvFiles), 'No CSV file found in %s', scriptDir);
@@ -7,14 +8,12 @@ filePath = fullfile(scriptDir, csvFiles(1).name);
 
 T = readtable(filePath, 'VariableNamingRule', 'preserve');
 
-x = T.("numTasks");
-
-% Keep only the bandwidth comparison series.
-y1 = T.("A(bup=1e7,bdown=5e7)");
-y2 = T.("A(bup=2e7,bdown=5e7)");
-y3 = T.("A(bup=3e7,bdown=5e7)");
-y4 = T.("A(bup=4e7,bdown=5e7)");
-y5 = T.("A(bup=5e7,bdown=5e7)");
+x = T{:, 1};
+y1 = T{:, 5};
+y2 = T{:, 6};
+y3 = T{:, 7};
+y4 = T{:, 8};
+y5 = T{:, 9};
 
 figure('Color', 'w', 'Position', [180, 100, 980, 680]);
 hold on; box on;
@@ -55,15 +54,15 @@ allY = [y1; y2; y3; y4; y5];
 allY = allY(~isnan(allY));
 ylim([0, ceil(max(allY) / 50) * 50 + 50]);
 
-xlabel(char([84 68 32 25968 37327]), 'FontName', 'Times New Roman', 'FontSize', 22);
+xlabel(char([84 68 32 25968 37327]), 'FontName', 'SimSun', 'FontSize', 22);
 ylabel(char([32508 21512 25104 26412]), 'FontName', 'SimSun', 'FontSize', 22);
 
 legend({ ...
-    '1 Mbps', ...
-    '2 Mbps', ...
-    '3 Mbps', ...
-    '4 Mbps', ...
-    '5 Mbps'}, ...
+    'LLM+HS (1 Mbps)', ...
+    'LLM+HS (2 Mbps)', ...
+    'LLM+HS (3 Mbps)', ...
+    'LLM+HS (4 Mbps)', ...
+    'LLM+HS (5 Mbps)'}, ...
     'Location', 'eastoutside', ...
     'FontName', 'Times New Roman', ...
     'FontSize', 12, ...

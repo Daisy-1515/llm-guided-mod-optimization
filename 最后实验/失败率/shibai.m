@@ -1,43 +1,37 @@
 clc; clear; close all;
 
-% 近似数据（按图片估计）
-groups = {'本文提出的LLM辅助优化算法', '未优化'};
-local_process = [13, 81];      % 本地处理
-ris_offload   = [797, 694];    % LLM辅助卸载
-failed        = [61, 96];    % 失败
+% Task-state comparison between the proposed method and the default-objective baseline.
+groups = {'LLM+HS', 'Default Objective'};
+localProcess = [13, 81];
+uavOffload = [797, 694];
+failedTasks = [61, 96];
 
-% 组位置
 x = 1:2;
 w = 0.22;
 
-figure('Color', 'w', 'Position', [300 200 560 380]);
+figure('Color', 'w', 'Position', [300 200 620 420]);
 hold on;
 
-% 三组柱
-b1 = bar(x - w, local_process, w, 'FaceColor', [0.93 0.69 0.13], 'EdgeColor', 'k');
-b2 = bar(x,      ris_offload,   w, 'FaceColor', [0.00 0.45 0.74], 'EdgeColor', 'k');
-b3 = bar(x + w,  failed,        w, 'FaceColor', [0.85 0.33 0.10], 'EdgeColor', 'k');
+b1 = bar(x - w, localProcess, w, 'FaceColor', [0.93 0.69 0.13], 'EdgeColor', 'k');
+b2 = bar(x,     uavOffload,   w, 'FaceColor', [0.00 0.45 0.74], 'EdgeColor', 'k');
+b3 = bar(x + w, failedTasks,  w, 'FaceColor', [0.85 0.33 0.10], 'EdgeColor', 'k');
 
-% 坐标轴与标签
-set(gca, ...
-    'XTick', x, ...
-    'XTickLabel', groups, ...
-    'FontSize', 12, ...
-    'LineWidth', 1.0, ...
-    'Box', 'on');
+ax = gca;
+ax.XTick = x;
+ax.XTickLabel = groups;
+ax.FontName = 'Times New Roman';
+ax.FontSize = 12;
+ax.LineWidth = 1.0;
+ax.Box = 'on';
 
-ylabel('任务数量', 'FontSize', 13);
+ylabel(char([20219 21153 25968 37327]), 'FontName', 'SimSun', 'FontSize', 13);
 ylim([0 850]);
 
-% 图例
-legend([b1, b2, b3], {'本地处理', 'LLM辅助卸载', '失败'}, ...
+legend([b1, b2, b3], ...
+    {char([26412 22320 22788 29702]), char([85 65 86 21368 36733]), char([22833 36133])}, ...
     'Location', 'north', ...
+    'FontName', 'SimSun', ...
     'FontSize', 11, ...
     'Box', 'on');
-
-% 中文显示更稳一些
-set(gca, 'FontName', 'SimHei');
-set(get(gca, 'YLabel'), 'FontName', 'SimHei');
-set(legend, 'FontName', 'SimHei');
 
 hold off;
